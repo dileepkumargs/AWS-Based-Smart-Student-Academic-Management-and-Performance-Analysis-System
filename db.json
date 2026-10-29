@@ -1,0 +1,288 @@
+{
+    "students": [
+        {
+            "id": 1,
+            "name": "Alice Johnson",
+            "year": 2023,
+            "course": "Computer Science",
+            "gpa": 3.8
+        },
+        {
+            "id": 2,
+            "name": "Bob Smith",
+            "year": 2022,
+            "course": "Mathematics",
+            "gpa": 3.5
+        },
+        {
+            "id": 3,
+            "name": "Charlie Brown",
+            "year": 2023,
+            "course": "Physics",
+            "gpa": 3.9
+        },
+        {
+            "id": 4,
+            "name": "Diana Prince",
+            "year": 2024,
+            "course": "Engineering",
+            "gpa": 3.7
+        },
+        {
+            "id": 5,
+            "name": "Ethan Hunt",
+            "year": 2022,
+            "course": "Business",
+            "gpa": 3.6
+        },
+        {
+            "id": 6,
+            "name": "Fiona Green",
+            "year": 2023,
+            "course": "Chemistry",
+            "gpa": 3.9
+        },
+        {
+            "id": 7,
+            "name": "George Wilson",
+            "year": 2024,
+            "course": "Biology",
+            "gpa": 3.4
+        },
+        {
+            "id": 8,
+            "name": "Hannah Lee",
+            "year": 2022,
+            "course": "Computer Science",
+            "gpa": 3.8
+        },
+        {
+            "id": 9,
+            "name": "Ian Cooper",
+            "year": 2023,
+            "course": "Mathematics",
+            "gpa": 3.7
+        },
+        {
+            "id": 10,
+            "name": "Julia Martinez",
+            "year": 2024,
+            "course": "Physics",
+            "gpa": 4.0
+        },
+        {
+            "id": 11,
+            "name": "Kevin Zhang",
+            "year": 2022,
+            "course": "Engineering",
+            "gpa": 3.5
+        },
+        {
+            "id": 12,
+            "name": "Laura Davis",
+            "year": 2023,
+            "course": "Business",
+            "gpa": 3.6
+        }
+    ],
+    "courses": [
+        {
+            "id": 1,
+            "code": "CS101",
+            "name": "Introduction to Computer Science",
+            "credits": 3,
+            "department": "Computer Science",
+            "instructor": "Dr. Smith"
+        },
+        {
+            "id": 2,
+            "code": "MATH201",
+            "name": "Calculus II",
+            "credits": 4,
+            "department": "Mathematics",
+            "instructor": "Dr. Johnson"
+        },
+        {
+            "id": 3,
+            "code": "PHYS101",
+            "name": "General Physics",
+            "credits": 4,
+            "department": "Physics",
+            "instructor": "Dr. Brown"
+        },
+        {
+            "id": 4,
+            "code": "ENG202",
+            "name": "Engineering Mechanics",
+            "credits": 3,
+            "department": "Engineering",
+            "instructor": "Dr. Wilson"
+        },
+        {
+            "id": 5,
+            "code": "BUS101",
+            "name": "Business Fundamentals",
+            "credits": 3,
+            "department": "Business",
+            "instructor": "Dr. Davis"
+        },
+        {
+            "id": 6,
+            "code": "CHEM101",
+            "name": "General Chemistry",
+            "credits": 4,
+            "department": "Chemistry",
+            "instructor": "Dr. Lee"
+        }
+    ],
+    "faculty": [
+        {
+            "id": 1,
+            "name": "Dr. Sarah Smith",
+            "email": "sarah.smith@university.edu",
+            "department": "Computer Science",
+            "specialization": "Data Structures & Algorithms",
+            "phone": "+1-555-0101"
+        },
+        {
+            "id": 2,
+            "name": "Prof. Michael Johnson",
+            "email": "m.johnson@university.edu",
+            "department": "Mathematics",
+            "specialization": "Calculus & Linear Algebra",
+            "phone": "+1-555-0102"
+        },
+        {
+            "id": 3,
+            "name": "Dr. Emily Brown",
+            "email": "e.brown@university.edu",
+            "department": "Physics",
+            "specialization": "Quantum Mechanics",
+            "phone": "+1-555-0103"
+        },
+        {
+            "id": 4,
+            "name": "Prof. David Wilson",
+            "email": "d.wilson@university.edu",
+            "department": "Engineering",
+            "specialization": "Mechanical Systems",
+            "phone": "+1-555-0104"
+        },
+        {
+            "id": 5,
+            "name": "Dr. Jennifer Davis",
+            "email": "j.davis@university.edu",
+            "department": "Business",
+            "specialization": "Marketing & Strategy",
+            "phone": "+1-555-0105"
+        },
+        {
+            "id": 6,
+            "name": "Prof. Robert Lee",
+            "email": "r.lee@university.edu",
+            "department": "Chemistry",
+            "specialization": "Organic Chemistry",
+            "phone": "+1-555-0106"
+        }
+    ],
+    "enrollments": [
+        {
+            "id": 1,
+            "studentId": 1,
+            "courseId": 1,
+            "grade": "A",
+            "semester": "Fall",
+            "year": 2024,
+            "status": "completed",
+            "enrolledDate": "2024-08-15"
+        },
+        {
+            "id": 2,
+            "studentId": 1,
+            "courseId": 2,
+            "grade": "A-",
+            "semester": "Fall",
+            "year": 2024,
+            "status": "completed",
+            "enrolledDate": "2024-08-15"
+        },
+        {
+            "id": 3,
+            "studentId": 2,
+            "courseId": 1,
+            "grade": "B+",
+            "semester": "Fall",
+            "year": 2024,
+            "status": "completed",
+            "enrolledDate": "2024-08-15"
+        },
+        {
+            "id": 4,
+            "studentId": 2,
+            "courseId": 3,
+            "grade": "A",
+            "semester": "Spring",
+            "year": 2025,
+            "status": "enrolled",
+            "enrolledDate": "2025-01-10"
+        },
+        {
+            "id": 5,
+            "studentId": 3,
+            "courseId": 2,
+            "grade": "B",
+            "semester": "Fall",
+            "year": 2024,
+            "status": "completed",
+            "enrolledDate": "2024-08-15"
+        },
+        {
+            "id": 6,
+            "studentId": 3,
+            "courseId": 4,
+            "semester": "Spring",
+            "year": 2025,
+            "status": "enrolled",
+            "enrolledDate": "2025-01-10"
+        },
+        {
+            "id": 7,
+            "studentId": 4,
+            "courseId": 1,
+            "grade": "A",
+            "semester": "Fall",
+            "year": 2024,
+            "status": "completed",
+            "enrolledDate": "2024-08-15"
+        },
+        {
+            "id": 8,
+            "studentId": 4,
+            "courseId": 5,
+            "semester": "Spring",
+            "year": 2025,
+            "status": "enrolled",
+            "enrolledDate": "2025-01-10"
+        },
+        {
+            "id": 9,
+            "studentId": 5,
+            "courseId": 3,
+            "grade": "B+",
+            "semester": "Fall",
+            "year": 2024,
+            "status": "completed",
+            "enrolledDate": "2024-08-15"
+        },
+        {
+            "id": 10,
+            "studentId": 5,
+            "courseId": 6,
+            "grade": "A-",
+            "semester": "Fall",
+            "year": 2024,
+            "status": "completed",
+            "enrolledDate": "2024-08-15"
+        }
+    ]
+}
