@@ -9,8 +9,10 @@ import { exportStudentsToCSV } from "@/lib/csv-utils";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
 import { Search, FileDown, Plus, Users } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { useAuth } from "@/lib/auth-context";
 
 export default function StudentsPage() {
+    const { user } = useAuth();
     const [students, setStudents] = useState<Student[]>([]);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
@@ -103,7 +105,7 @@ export default function StudentsPage() {
                         <FileDown className="w-4 h-4 text-emerald-600" />
                         Export
                     </button>
-                    <StudentForm onSubmit={handleCreateStudent} />
+                    {user?.role === "SUPER_ADMIN" && <StudentForm onSubmit={handleCreateStudent} />}
                 </div>
             </div>
 

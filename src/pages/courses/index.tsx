@@ -9,8 +9,10 @@ import { CourseFormData } from "@/lib/validators";
 import { exportCoursesToCSV } from "@/lib/csv-utils";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
 import { Search, FileDown, Plus, BookOpen } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 export default function CoursesPage() {
+    const { user } = useAuth();
     const [courses, setCourses] = useState<Course[]>([]);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
@@ -103,7 +105,7 @@ export default function CoursesPage() {
                         <FileDown className="w-4 h-4 text-emerald-600" />
                         Export
                     </button>
-                    <CourseForm onSubmit={handleCreateCourse} />
+                    {user?.role === "SUPER_ADMIN" && <CourseForm onSubmit={handleCreateCourse} />}
                 </div>
             </div>
 

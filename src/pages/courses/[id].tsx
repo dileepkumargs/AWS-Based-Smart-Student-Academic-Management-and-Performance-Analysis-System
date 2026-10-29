@@ -1,7 +1,9 @@
-import { getDB } from "@/lib/mock-db";
 import { toast } from "react-hot-toast";
 import { GetServerSideProps } from "next";
-import { useState, useEffect } from "react";
+import { getPool } from "@/lib/database";
+import { canAccessCourse } from "@/lib/academic-access";
+import { getAuthenticatedUser } from "@/lib/auth";
+import { useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { Course } from "@/types/course";
 import { EnrollmentWithDetails } from "@/types/enrollment";
@@ -15,6 +17,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { BookOpen, Users, CheckCircle2, Clock, Trash2, Edit3, Briefcase, Bookmark, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 
 interface Props {
     course: Course | null;
@@ -22,6 +25,7 @@ interface Props {
 }
 
 export default function CourseDetailPage({ course, error }: Props) {
+    const { user } = useAuth();
     const router = useRouter();
     const [isEditing, setIsEditing] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -29,22 +33,20 @@ export default function CourseDetailPage({ course, error }: Props) {
     const [enrollments, setEnrollments] = useState<EnrollmentWithDetails[]>([]);
     const [loadingEnrollments, setLoadingEnrollments] = useState(true);
 
-    useEffect(() => {
-        if (course) {
-            fetchEnrollments();
-        }
-    }, [course]);
+    const fetchEnrollments = useCallback((courseId: number) => EnrollmentService.getByCourse(courseId), []);
 
-    const fetchEnrollments = async () => {
-        try {
-            const data = await EnrollmentService.getByCourse(course!.id);
-            setEnrollments(data);
-        } catch (error) {
+    useEffect(() => {
+        if (!course) return;
+        let active = true;
+        fetchEnrollments(course.id).then(data => {
+            if (active) setEnrollments(data);
+        }).catch(error => {
             console.error("Failed to fetch enrollments:", error);
-        } finally {
-            setLoadingEnrollments(false);
-        }
-    };
+        }).finally(() => {
+            if (active) setLoadingEnrollments(false);
+        });
+        return () => { active = false; };
+    }, [course, fetchEnrollments]);
 
     if (error || !course) {
         return (
@@ -86,13 +88,13 @@ export default function CourseDetailPage({ course, error }: Props) {
             await CourseService.delete(course.id);
             toast.success("Course removed from catalog.");
             router.push("/courses");
-        } catch (error) {
+        } catch {
             setIsDeleting(false);
             toast.error("Failed to delete course");
         }
     };
 
-    const actions = (
+    const actions = user?.role === "SUPER_ADMIN" ? (
         <>
             <button
                 onClick={() => setIsEditing(true)}
@@ -109,7 +111,7 @@ export default function CourseDetailPage({ course, error }: Props) {
                 Delete
             </button>
         </>
-    );
+    ) : null;
 
     return (
         <DetailLayout
@@ -340,13 +342,25 @@ export default function CourseDetailPage({ course, error }: Props) {
 }
 
 export const getServerSideProps: GetServerSideProps<Props> = async (context) => {
-    const { id } = context.params!;
-    const db = getDB();
-    const courseId = Number(id);
-
-    const course = db.courses.find(c => c.id === courseId);
-
-    if (!course) {
+    context.res.setHeader("Cache-Control", "private, no-store");
+    const user = await getAuthenticatedUser(context.req);
+    if (!user) {
+        return { redirect: { destination: "/login", permanent: false } };
+    }
+    if (user.mustChangePassword) {
+        return { redirect: { destination: "/change-password", permanent: false } };
+    }
+    const courseId = Number(context.params?.id);
+    if (!Number.isSafeInteger(courseId) || courseId < 1 || !(await canAccessCourse(user, courseId))) {
+        return { notFound: true };
+    }
+    const { rows } = await getPool().query(
+        `SELECT c.id, c.code, c.name, c.credits, c.department,
+                COALESCE(f.name, c.instructor) AS instructor
+         FROM courses c LEFT JOIN faculty f ON f.id = c.faculty_id WHERE c.id = $1`,
+        [courseId]
+    );
+    if (!rows[0]) {
         return {
             props: {
                 course: null,
@@ -356,6 +370,15 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
     }
 
     return {
-        props: { course }
+        props: {
+            course: {
+                code: rows[0].code,
+                name: rows[0].name,
+                id: Number(rows[0].id),
+                credits: Number(rows[0].credits),
+                department: rows[0].department,
+                instructor: rows[0].instructor ?? undefined
+            }
+        }
     };
 };

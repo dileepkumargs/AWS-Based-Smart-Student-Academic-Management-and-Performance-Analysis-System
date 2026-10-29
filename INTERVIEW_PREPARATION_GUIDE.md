@@ -80,7 +80,7 @@ export function getDB() {
 **Why This Pattern?**
 - **Hot Reload Persistence**: In development, Next.js hot-reloads on code changes. Without global singleton, the data would reset on every change
 - **SSR Compatibility**: Node.js global scope ensures same data instance across server-side renders
-- **Migration Ready**: When switching to real database (PostgreSQL), only need to change `getDB()` implementation
+- **Database Persistence**: Academic records and authentication data are stored in MySQL through a pooled connection.
 
 #### 3. **Component Composition**
 ```
@@ -533,7 +533,7 @@ if (!global.__db) {
 
 `global` in Node.js persists across hot reloads. This ensures data isn't reset when I edit a component.
 
-**Production Alternative:** In production, I'd replace this with a real database like PostgreSQL using Prisma, and only change the `getDB()` function.
+**Production Alternative:** The application now uses MySQL with parameterized queries and migrations. Prisma is not currently used.
 
 ### **React & State Management**
 
@@ -583,7 +583,7 @@ const { register, handleSubmit, formState: { errors } } = useForm({
 
 **Production Migration Plan:**
 I designed it to be **migration-ready**:
-1. Install Prisma + PostgreSQL
+1. Configure a MySQL 8 database and the `DATABASE_URL` environment variable
 2. Define Prisma schema (same structure as current types)
 3. Replace `getDB()` calls with Prisma client queries
 4. Everything else (services, components, API routes) stays the same
@@ -844,7 +844,7 @@ const handleDelete = async (id: number) => {
 ```typescript
 // .env.local
 NEXT_PUBLIC_API_URL=http://localhost:3000
-DATABASE_URL=postgresql://...
+DATABASE_URL=mysql://user:password@localhost:3306/academic_dashboard
 
 // next.config.ts
 env: {
@@ -889,7 +889,7 @@ class ErrorBoundary extends React.Component {
 4. **Validation Consistency**: Solved with shared schemas
 
 ### **When Asked: "What would you improve?"**
-1. **Real Database**: Migrate to PostgreSQL with Prisma
+1. **Machine Learning**: Build and evaluate prediction models on sufficient historical data
 2. **Authentication**: Add NextAuth for role-based access
 3. **Testing**: Add Jest + React Testing Library
 4. **Caching**: Add React Query for client-side caching

@@ -10,8 +10,10 @@ import { StudentService } from "@/services/student.service";
 import { CourseService } from "@/services/course.service";
 import { EnrollmentFormData } from "@/lib/validators";
 import { exportToCSV } from "@/lib/csv-utils";
+import { useAuth } from "@/lib/auth-context";
 
 export default function EnrollmentsPage() {
+    const { user } = useAuth();
     const [enrollments, setEnrollments] = useState<EnrollmentWithDetails[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
     const [courses, setCourses] = useState<Course[]>([]);
@@ -108,11 +110,13 @@ export default function EnrollmentsPage() {
             </div>
 
             {/* Enrollment Form */}
-            <EnrollmentForm
-                onSubmit={handleCreateEnrollment}
-                students={students}
-                courses={courses}
-            />
+            {user?.role !== "STUDENT" && (
+                <EnrollmentForm
+                    onSubmit={handleCreateEnrollment}
+                    students={students}
+                    courses={courses}
+                />
+            )}
 
             {/* Export Button */}
             <div className="mb-6 flex justify-end">
@@ -137,7 +141,7 @@ export default function EnrollmentsPage() {
                     {/* Enrollment Table */}
                     <EnrollmentTable
                         enrollments={enrollments}
-                        onDelete={handleDelete}
+                        onDelete={user?.role === "SUPER_ADMIN" ? handleDelete : undefined}
                     />
 
                     {/* Pagination */}

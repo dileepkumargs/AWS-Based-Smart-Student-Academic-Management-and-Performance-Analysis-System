@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { Faculty } from "@/types/faculty";
 import { Course } from "@/types/course";
@@ -8,75 +8,77 @@ import { CourseService } from "@/services/course.service";
 import { EnrollmentService } from "@/services/enrollment.service";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
-import { Users, BookOpen, GraduationCap, FlaskConical, CheckCircle2, ChevronRight, UserCircle, LayoutDashboard, Search } from "lucide-react";
+import { BookOpen, FlaskConical, CheckCircle2, ChevronRight, LayoutDashboard, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
 
 export default function FacultyDashboard() {
+    const { user } = useAuth();
     const [allFaculty, setAllFaculty] = useState<Faculty[]>([]);
     const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
     const [myCourses, setMyCourses] = useState<Course[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [courseEnrollments, setCourseEnrollments] = useState<EnrollmentWithDetails[]>([]);
     const [updatingGrade, setUpdatingGrade] = useState<{ id: number, grade: string } | null>(null);
 
-    useEffect(() => {
-        fetchInitialData();
+    const fetchInitialData = useCallback(async () => {
+        const res = await FacultyService.list({ page: 1, limit: 100 });
+        return res.data;
     }, []);
 
-    async function fetchInitialData() {
-        try {
-            const res = await FacultyService.list({ page: 1, limit: 100 });
-            setAllFaculty(res.data);
-            if (res.data.length > 0) {
-                setSelectedFaculty(res.data[0]);
+    useEffect(() => {
+        let active = true;
+        fetchInitialData().then(data => {
+            if (active) {
+                setAllFaculty(data);
+                if (data.length > 0) setSelectedFaculty(data[0]);
             }
-        } catch (error) {
+        }).catch(error => {
             console.error("Failed to fetch faculty:", error);
-        }
-    }
+        });
+        return () => { active = false; };
+    }, [fetchInitialData]);
+
+    const fetchMyCourses = useCallback(async (facultyName: string) => {
+        const res = await CourseService.list({ page: 1, limit: 1000 });
+        return res.data.filter(course => course.instructor === facultyName);
+    }, []);
 
     useEffect(() => {
-        if (selectedFaculty) {
-            fetchMyCourses();
-            setSelectedCourse(null);
-            setCourseEnrollments([]);
-        }
-    }, [selectedFaculty]);
-
-    async function fetchMyCourses() {
-        setLoading(true);
-        try {
-            const res = await CourseService.list({ page: 1, limit: 1000 });
-            const filtered = res.data.filter(c => c.instructor === selectedFaculty?.name);
-            setMyCourses(filtered);
-        } catch (error) {
+        if (!selectedFaculty) return;
+        let active = true;
+        fetchMyCourses(selectedFaculty.name).then(data => {
+            if (active) setMyCourses(data);
+        }).catch(error => {
             console.error("Failed to fetch my courses:", error);
-        } finally {
-            setLoading(false);
-        }
-    }
+        }).finally(() => {
+            if (active) setLoading(false);
+        });
+        return () => { active = false; };
+    }, [selectedFaculty, fetchMyCourses]);
+
+    const fetchCourseEnrollments = useCallback((courseId: number) => EnrollmentService.getByCourse(courseId), []);
 
     useEffect(() => {
-        if (selectedCourse) {
-            fetchCourseEnrollments();
-        }
-    }, [selectedCourse]);
-
-    async function fetchCourseEnrollments() {
-        try {
-            const data = await EnrollmentService.getByCourse(selectedCourse!.id);
-            setCourseEnrollments(data);
-        } catch (error) {
+        if (!selectedCourse) return;
+        let active = true;
+        fetchCourseEnrollments(selectedCourse.id).then(data => {
+            if (active) setCourseEnrollments(data);
+        }).catch(error => {
             console.error("Failed to fetch course enrollments:", error);
-        }
-    }
+        });
+        return () => { active = false; };
+    }, [selectedCourse, fetchCourseEnrollments]);
 
     async function handleGradeUpdate(enrollmentId: number, grade: string) {
         try {
             await EnrollmentService.update(enrollmentId, { grade, status: 'completed' });
             toast.success("Grade updated successfully!");
-            fetchCourseEnrollments();
+            if (selectedCourse) {
+                const data = await fetchCourseEnrollments(selectedCourse.id);
+                setCourseEnrollments(data);
+            }
             setUpdatingGrade(null);
         } catch (error) {
             console.error(error);
@@ -95,24 +97,29 @@ export default function FacultyDashboard() {
                     <div className="flex items-center gap-3">
                         <div className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border border-emerald-500/30 flex items-center gap-2">
                             <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                            Faculty Simulation
+                            {user?.role === "SUPER_ADMIN" ? "Administrator Faculty View" : "Faculty Workspace"}
                         </div>
                     </div>
                     <div>
                         <h1 className="text-4xl font-black tracking-tight">Management Portal</h1>
                         <p className="text-slate-400 font-medium mt-1 max-w-xl text-sm italic">
-                            Experience the institution from any staff member's perspective. View assigned courses and manage student grades.
+                            {user?.role === "SUPER_ADMIN"
+                                ? "Review faculty assignments and oversee course grade management."
+                                : "View your assigned courses, class rosters, and manage student grades."}
                         </p>
                     </div>
 
                     <div className="flex items-center gap-4 pt-4">
                         <div className="flex items-center gap-3 bg-slate-800/50 backdrop-blur-md rounded-2xl p-3 border border-slate-700/50">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-2">Simulate As:</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-2">{user?.role === "SUPER_ADMIN" ? "Faculty profile:" : "Signed in as:"}</span>
                             <select
                                 value={selectedFaculty?.id || ""}
                                 onChange={(e) => {
                                     const faculty = allFaculty.find(f => f.id === Number(e.target.value));
                                     setSelectedFaculty(faculty || null);
+                                    setLoading(true);
+                                    setSelectedCourse(null);
+                                    setCourseEnrollments([]);
                                 }}
                                 className="bg-slate-800 border-none rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500 outline-none transition-all cursor-pointer min-w-[240px]"
                             >
@@ -155,7 +162,10 @@ export default function FacultyDashboard() {
                                     myCourses.map(course => (
                                         <button
                                             key={course.id}
-                                            onClick={() => setSelectedCourse(course)}
+                                            onClick={() => {
+                                                setSelectedCourse(course);
+                                                setCourseEnrollments([]);
+                                            }}
                                             className={cn(
                                                 "w-full text-left p-6 rounded-2xl border transition-all duration-300 relative group",
                                                 selectedCourse?.id === course.id

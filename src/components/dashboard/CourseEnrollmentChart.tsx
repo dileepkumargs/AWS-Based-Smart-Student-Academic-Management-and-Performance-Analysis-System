@@ -1,51 +1,52 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Course } from "@/types/course";
 
-const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
+const Chart = dynamic(() => import("react-apexcharts"), {
+    ssr: false,
+    loading: () => <div className="h-80 animate-pulse rounded-2xl bg-slate-100" role="status">Loading chart...</div>
+});
 
 interface Props {
     courses: Course[];
 }
 
 export default function CourseEnrollmentChart({ courses }: Props) {
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
     const [enrollmentData, setEnrollmentData] = useState<{ name: string; fullName: string; enrollments: number }[]>([]);
 
-    useEffect(() => {
-        if (courses.length > 0) {
-            fetchEnrollmentCounts();
+    const fetchEnrollmentCounts = useCallback(async () => {
+        if (courses.length === 0) {
+            return [];
         }
-    }, [courses]);
-
-    async function fetchEnrollmentCounts() {
-        const _import_EnrollmentService = (await import("@/services/enrollment.service")).EnrollmentService;
 
         try {
-            const promises = courses.map(async (course) => {
-                // Get real enrollments for this course
-                const enrollments = await _import_EnrollmentService.getByCourse(course.id);
-                // Filter only 'enrolled' or 'completed' status to count as active students
-                const activeCount = enrollments.filter(e => e.status === 'enrolled' || e.status === 'completed').length;
+            const enrollmentService = (await import("@/services/enrollment.service")).EnrollmentService;
+            const results = await Promise.all(courses.map(async (course) => {
+                const enrollments = await enrollmentService.getByCourse(course.id);
+                const activeCount = enrollments.filter(
+                    enrollment => enrollment.status === "enrolled" || enrollment.status === "completed"
+                ).length;
 
                 return {
                     name: course.code,
                     fullName: course.name,
                     enrollments: activeCount
                 };
-            });
-
-            const results = await Promise.all(promises);
-            setEnrollmentData(results);
+            }));
+            return results;
         } catch (error) {
             console.error("Failed to fetch real enrollment counts:", error);
+            return [];
         }
-    }
+    }, [courses]);
+
+    useEffect(() => {
+        let active = true;
+        fetchEnrollmentCounts().then(results => {
+            if (active) setEnrollmentData(results);
+        });
+        return () => { active = false; };
+    }, [fetchEnrollmentCounts]);
 
     const chartOptions: ApexCharts.ApexOptions = {
         chart: {
@@ -127,14 +128,14 @@ export default function CourseEnrollmentChart({ courses }: Props) {
         tooltip: {
             theme: 'dark',
             y: {
-                formatter: function (val: any) {
+                formatter: function (val) {
                     return val + " students";
                 }
             },
             x: {
-                formatter: function (val: any, opts: any) {
+                formatter: function (val, opts) {
                     const course = enrollmentData[opts.dataPointIndex];
-                    return course ? course.fullName : val;
+                    return course ? course.fullName : String(val);
                 }
             },
             style: {
@@ -147,17 +148,6 @@ export default function CourseEnrollmentChart({ courses }: Props) {
         name: 'Enrollments',
         data: enrollmentData.map(e => e.enrollments)
     }];
-
-    if (!mounted) {
-        return (
-            <div className="bg-white rounded-2xl shadow-xl border-2 border-gray-200 p-8 h-full">
-                <div className="animate-pulse">
-                    <div className="h-8 bg-gray-200 rounded w-1/2 mb-6"></div>
-                    <div className="h-64 bg-gray-200 rounded"></div>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="bg-white rounded-2xl shadow-xl border-2 border-gray-200 p-8 relative overflow-hidden">
@@ -175,7 +165,7 @@ export default function CourseEnrollmentChart({ courses }: Props) {
                     <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                         Course Enrollments
                     </h2>
-                    <p className="text-sm text-gray-600">Current semester enrollment statistics</p>
+                    <p className="text-sm text-gray-600">Enrolled and completed records across all listed terms</p>
                 </div>
             </div>
 

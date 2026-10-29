@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { EnrollmentWithDetails } from "@/types/enrollment";
 
 interface Props {
     enrollments: EnrollmentWithDetails[];
-    onDelete: (id: number) => void;
+    onDelete?: (id: number) => void;
 }
 
 const gradeColors: Record<string, string> = {
@@ -54,7 +53,7 @@ export default function EnrollmentTable({ enrollments, onDelete }: Props) {
                             <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Year</th>
                             <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Grade</th>
                             <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-4 text-center text-sm font-bold uppercase tracking-wider">Actions</th>
+                            {onDelete && <th className="px-6 py-4 text-center text-sm font-bold uppercase tracking-wider">Actions</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -100,7 +99,7 @@ export default function EnrollmentTable({ enrollments, onDelete }: Props) {
                                         {enrollment.status}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4">
+                                {onDelete && <td className="px-6 py-4">
                                     <div className="flex items-center justify-center gap-2">
                                         <button
                                             onClick={() => onDelete(enrollment.id)}
@@ -112,7 +111,7 @@ export default function EnrollmentTable({ enrollments, onDelete }: Props) {
                                             </svg>
                                         </button>
                                     </div>
-                                </td>
+                                </td>}
                             </tr>
                         ))}
                     </tbody>

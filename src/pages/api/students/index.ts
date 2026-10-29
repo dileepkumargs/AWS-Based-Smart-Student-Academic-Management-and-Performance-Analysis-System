@@ -1,90 +1,74 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDB } from "@/lib/mock-db";
+import { getPool } from "@/lib/database";
 import { createStudentSchema } from "@/lib/validators";
-import { Student } from "@/types/student";
+import { getPagination, getQueryString, getRecordCount } from "@/lib/academic-access";
+import { requireUser, writeAuditLog } from "@/lib/auth";
 
-export default function handler(
-    req: NextApiRequest,
-    res: NextApiResponse
-) {
-    const db = getDB();
+const studentSelect = `
+    SELECT s.id, s.name, s.year, s.course, s.gpa
+    FROM students s
+    WHERE ($1 = 'SUPER_ADMIN'
+        OR ($1 = 'STUDENT' AND s.user_id = $2)
+        OR ($1 = 'FACULTY' AND EXISTS (
+            SELECT 1 FROM enrollments e
+            JOIN courses c ON c.id = e.course_id
+            WHERE e.student_id = s.id AND c.faculty_id = $3
+        )))
+      AND ($4 = '' OR LOWER(s.name) LIKE CONCAT('%', LOWER($4), '%') OR CAST(s.id AS CHAR) = $4)
+      AND ($5 IS NULL OR s.year = $5)
+      AND ($6 = '' OR s.course = $6)
+`;
 
-    switch (req.method) {
-        case "GET":
-            return getStudents(req, res, db);
-        case "POST":
-            return createStudent(req, res, db);
-        default:
-            return res.status(405).end();
-    }
-}
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    const user = await requireUser(req, res);
+    if (!user) return;
 
-function getStudents(
-    req: NextApiRequest,
-    res: NextApiResponse,
-    db: ReturnType<typeof getDB>
-) {
-    const { page = "1", limit = "10", search = "", year, course } = req.query;
-
-    const pageNum = Number(page);
-    const limitNum = Number(limit);
-
-    let students: Student[] = db.students;
-
-    // 🔍 search
-    if (search) {
-        students = students.filter((s) =>
-            s.name.toLowerCase().includes(String(search).toLowerCase())
-        );
-    }
-
-    // 📅 filter by year
-    if (year) {
-        students = students.filter((s) => s.year === Number(year));
-    }
-
-    // 📚 filter by course (department-like)
-    if (course) {
-        students = students.filter((s) => s.course === String(course));
-    }
-
-    const total = students.length;
-
-    // 📄 pagination
-    const start = (pageNum - 1) * limitNum;
-    const end = start + limitNum;
-    const paginated = students.slice(start, end);
-
-    return res.status(200).json({
-        data: paginated,
-        meta: {
-            total,
-            page: pageNum,
-            limit: limitNum
-        }
-    });
-}
-
-function createStudent(
-    req: NextApiRequest,
-    res: NextApiResponse,
-    db: ReturnType<typeof getDB>
-) {
-    const parsed = createStudentSchema.safeParse(req.body);
-
-    if (!parsed.success) {
-        return res.status(400).json({
-            message: "Invalid payload",
-            errors: parsed.error.flatten().fieldErrors
+    if (req.method === "GET") {
+        const { page, limit, offset } = getPagination(req);
+        const search = getQueryString(req, "search");
+        const year = getQueryString(req, "year");
+        const course = getQueryString(req, "course");
+        const yearFilter = year && /^\d{1,4}$/.test(year) ? Number(year) : null;
+        const values = [user.role, user.id, user.facultyId, search, yearFilter, course] as const;
+        const [result, total] = await Promise.all([
+            getPool().query(
+                `${studentSelect} ORDER BY s.id LIMIT $7 OFFSET $8`,
+                [...values, limit, offset]
+            ),
+            getRecordCount(
+                `SELECT COUNT(*) AS total FROM (${studentSelect}) matching`,
+                [...values]
+            )
+        ]);
+        return res.status(200).json({
+            data: result.rows.map(row => ({ ...row, id: Number(row.id), year: Number(row.year), gpa: Number(row.gpa) })),
+            meta: { total, page, limit }
         });
     }
 
-    const newStudent: Student = {
-        id: Date.now(),
-        ...parsed.data
-    };
+    if (req.method !== "POST") {
+        res.setHeader("Allow", "GET, POST");
+        return res.status(405).end();
+    }
+    if (user.role !== "SUPER_ADMIN") {
+        return res.status(403).json({ message: "Only a Super Admin can create student records." });
+    }
 
-    db.students.push(newStudent);
+    const parsed = createStudentSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid payload.", errors: parsed.error.flatten().fieldErrors });
+    }
 
-    return res.status(201).json(newStudent);
+    const result = await getPool().query(
+        `INSERT INTO students (name, year, course, gpa)
+         VALUES ($1, $2, $3, $4)`,
+        [parsed.data.name, parsed.data.year, parsed.data.course, parsed.data.gpa]
+    );
+    const { rows } = await getPool().query(
+        "SELECT id, name, year, course, gpa FROM students WHERE id = $1",
+        [result.insertId]
+    );
+    const student = { ...rows[0], id: Number(rows[0].id), year: Number(rows[0].year), gpa: Number(rows[0].gpa) };
+    await writeAuditLog(user.id, "student.created", "student", student.id);
+    return res.status(201).json(student);
 }

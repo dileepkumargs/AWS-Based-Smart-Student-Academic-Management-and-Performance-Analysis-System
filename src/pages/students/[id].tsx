@@ -1,7 +1,9 @@
-import { getDB } from "@/lib/mock-db";
 import { toast } from "react-hot-toast";
 import { GetServerSideProps } from "next";
-import { useState, useEffect } from "react";
+import { getPool } from "@/lib/database";
+import { canAccessStudent } from "@/lib/academic-access";
+import { getAuthenticatedUser } from "@/lib/auth";
+import { useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { Student } from "@/types/student";
 import { EnrollmentWithDetails } from "@/types/enrollment";
@@ -15,6 +17,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Users, GraduationCap, CheckCircle2, Clock, Trash2, Edit3, BookOpen, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 
 interface Props {
     student: Student | null;
@@ -22,6 +25,7 @@ interface Props {
 }
 
 export default function StudentDetailPage({ student, error }: Props) {
+    const { user } = useAuth();
     const router = useRouter();
     const [isEditing, setIsEditing] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -29,22 +33,20 @@ export default function StudentDetailPage({ student, error }: Props) {
     const [enrollments, setEnrollments] = useState<EnrollmentWithDetails[]>([]);
     const [loadingEnrollments, setLoadingEnrollments] = useState(true);
 
-    useEffect(() => {
-        if (student) {
-            fetchEnrollments();
-        }
-    }, [student]);
+    const fetchEnrollments = useCallback((studentId: number) => EnrollmentService.getByStudent(studentId), []);
 
-    const fetchEnrollments = async () => {
-        try {
-            const data = await EnrollmentService.getByStudent(student!.id);
-            setEnrollments(data);
-        } catch (error) {
+    useEffect(() => {
+        if (!student) return;
+        let active = true;
+        fetchEnrollments(student.id).then(data => {
+            if (active) setEnrollments(data);
+        }).catch(error => {
             console.error("Failed to fetch enrollments:", error);
-        } finally {
-            setLoadingEnrollments(false);
-        }
-    };
+        }).finally(() => {
+            if (active) setLoadingEnrollments(false);
+        });
+        return () => { active = false; };
+    }, [student, fetchEnrollments]);
 
     if (error || !student) {
         return (
@@ -86,13 +88,13 @@ export default function StudentDetailPage({ student, error }: Props) {
             await StudentService.delete(student.id);
             toast.success("Student deleted successfully!");
             router.push("/students");
-        } catch (error) {
+        } catch {
             setIsDeleting(false);
             toast.error("Failed to delete student");
         }
     };
 
-    const actions = (
+    const actions = user?.role === "SUPER_ADMIN" ? (
         <>
             <button
                 onClick={() => setIsEditing(true)}
@@ -109,7 +111,7 @@ export default function StudentDetailPage({ student, error }: Props) {
                 Delete
             </button>
         </>
-    );
+    ) : null;
 
     return (
         <DetailLayout
@@ -339,13 +341,23 @@ export default function StudentDetailPage({ student, error }: Props) {
 }
 
 export const getServerSideProps: GetServerSideProps<Props> = async (context) => {
-    const { id } = context.params!;
-    const db = getDB();
-    const studentId = Number(id);
-
-    const student = db.students.find(s => s.id === studentId);
-
-    if (!student) {
+    context.res.setHeader("Cache-Control", "private, no-store");
+    const user = await getAuthenticatedUser(context.req);
+    if (!user) {
+        return { redirect: { destination: "/login", permanent: false } };
+    }
+    if (user.mustChangePassword) {
+        return { redirect: { destination: "/change-password", permanent: false } };
+    }
+    const studentId = Number(context.params?.id);
+    if (!Number.isSafeInteger(studentId) || studentId < 1 || !(await canAccessStudent(user, studentId))) {
+        return { notFound: true };
+    }
+    const { rows } = await getPool().query(
+        "SELECT id, name, year, course, gpa FROM students WHERE id = $1",
+        [studentId]
+    );
+    if (!rows[0]) {
         return {
             props: {
                 student: null,
@@ -355,8 +367,14 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
     }
 
     return {
-        props: { student }
+        props: {
+            student: {
+                id: Number(rows[0].id),
+                name: rows[0].name,
+                year: Number(rows[0].year),
+                course: rows[0].course,
+                gpa: Number(rows[0].gpa)
+            }
+        }
     };
 };
-
-

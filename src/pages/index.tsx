@@ -8,7 +8,7 @@ import { Course } from "@/types/course";
 import TopStudentsLeaderboard from "@/components/dashboard/TopStudentsLeaderboard";
 import CourseEnrollmentChart from "@/components/dashboard/CourseEnrollmentChart";
 import { StatCard } from "@/components/ui/StatCard";
-import { Users, BookOpen, GraduationCap, BarChart3, Plus, ArrowRight } from "lucide-react";
+import { Users, BookOpen, GraduationCap, BarChart3, ArrowRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 
@@ -25,37 +25,37 @@ export default function DashboardPage() {
   const [courses, setCourses] = useState<Course[]>([]);
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    async function loadStats() {
+      try {
+        const [studentsRes, coursesRes, facultyRes] = await Promise.all([
+          StudentService.list({ page: 1, limit: 1000 }),
+          CourseService.list({ page: 1, limit: 1000 }),
+          FacultyService.list({ page: 1, limit: 1000 })
+        ]);
 
-  async function fetchStats() {
-    try {
-      const [studentsRes, coursesRes, facultyRes] = await Promise.all([
-        StudentService.list({ page: 1, limit: 1000 }),
-        CourseService.list({ page: 1, limit: 1000 }),
-        FacultyService.list({ page: 1, limit: 1000 })
-      ]);
+        const studentsData = studentsRes.data;
+        const coursesData = coursesRes.data;
+        const avgGPA = studentsData.length > 0
+          ? studentsData.reduce((sum, student) => sum + student.gpa, 0) / studentsData.length
+          : 0;
 
-      const studentsData = studentsRes.data;
-      const coursesData = coursesRes.data;
-      const avgGPA = studentsData.length > 0
-        ? studentsData.reduce((sum, s) => sum + s.gpa, 0) / studentsData.length
-        : 0;
-
-      setStudents(studentsData);
-      setCourses(coursesData);
-      setStats({
-        totalStudents: studentsRes.meta.total,
-        totalCourses: coursesRes.meta.total,
-        totalFaculty: facultyRes.meta.total,
-        averageGPA: avgGPA,
-        loading: false
-      });
-    } catch (error) {
-      console.error("Failed to fetch stats:", error);
-      setStats(prev => ({ ...prev, loading: false }));
+        setStudents(studentsData);
+        setCourses(coursesData);
+        setStats({
+          totalStudents: studentsRes.meta.total,
+          totalCourses: coursesRes.meta.total,
+          totalFaculty: facultyRes.meta.total,
+          averageGPA: avgGPA,
+          loading: false
+        });
+      } catch (error) {
+        console.error("Failed to fetch stats:", error);
+        setStats(prev => ({ ...prev, loading: false }));
+      }
     }
-  }
+
+    void loadStats();
+  }, []);
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto space-y-8">
@@ -72,15 +72,14 @@ export default function DashboardPage() {
         <StatCard
           title="Total Students"
           value={stats.loading ? "..." : stats.totalStudents}
-          description="Enrolled in active programs"
+          description="Student records"
           icon={Users}
-          trend={{ value: 12, isUp: true }}
           iconClassName="bg-blue-50 text-blue-600"
         />
         <StatCard
-          title="Active Courses"
+          title="Courses"
           value={stats.loading ? "..." : stats.totalCourses}
-          description="Offered this semester"
+          description="In the course catalog"
           icon={BookOpen}
           iconClassName="bg-amber-50 text-amber-600"
         />
@@ -94,9 +93,8 @@ export default function DashboardPage() {
         <StatCard
           title="Average GPA"
           value={stats.loading ? "..." : stats.averageGPA.toFixed(2)}
-          description="Institutional performance"
+          description="Average current student GPA"
           icon={BarChart3}
-          trend={{ value: 2.4, isUp: true }}
           iconClassName="bg-emerald-50 text-emerald-600"
         />
       </div>

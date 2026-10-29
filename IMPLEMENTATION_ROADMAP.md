@@ -1,5 +1,7 @@
 # Academic Management Dashboard - Implementation Roadmap
 
+> Historical implementation checklist, not a current completion or production-readiness statement. See [README.md](./README.md) for the current architecture, verified features, and remaining gaps.
+
 ## ✅ Completed Segments (1-6)
 
 ### Segment 1: Project Setup ✅

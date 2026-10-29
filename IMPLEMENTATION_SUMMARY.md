@@ -1,6 +1,8 @@
 # Academic Management Dashboard - Implementation Summary
 
-## 🎉 MAJOR PROGRESS: Segments 1-8 (Backend Complete)
+> Historical progress snapshot. For the verified current feature set, persistent JSON storage behavior, deployment constraints, and security gaps, see [README.md](./README.md). This prototype is not production-ready for real student data because authentication and role-based authorization are not implemented.
+
+## Historical progress: Segments 1-8
 
 ### ✅ Fully Completed Modules
 

@@ -1,78 +1,78 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDB } from "@/lib/mock-db";
+import { getPool } from "@/lib/database";
 import { courseSchema } from "@/lib/validators";
+import { canAccessCourse } from "@/lib/academic-access";
+import { requireUser, writeAuditLog } from "@/lib/auth";
 
-export default function handler(
-    req: NextApiRequest,
-    res: NextApiResponse
-) {
-    const { id } = req.query;
-    const db = getDB();
-    const courseId = Number(id);
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const id = Number(req.query.id);
+    if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ message: "Invalid course ID." });
 
-    switch (req.method) {
-        case "GET":
-            return getCourse(courseId, db, res);
-        case "PUT":
-            return updateCourse(courseId, req.body, db, res);
-        case "DELETE":
-            return deleteCourse(courseId, db, res);
-        default:
-            return res.status(405).end();
-    }
-}
-
-function getCourse(id: number, db: ReturnType<typeof getDB>, res: NextApiResponse) {
-    const course = db.courses.find((c) => c.id === id);
-
-    if (!course) {
-        return res.status(404).json({ message: "Course not found" });
+    if (req.method === "GET") {
+        if (!(await canAccessCourse(user, id))) {
+            return res.status(user.role === "STUDENT" ? 404 : 403).json({ message: "Course not found." });
+        }
+        const { rows } = await getPool().query(
+            `SELECT c.id, c.code, c.name, c.credits, c.department,
+                    COALESCE(f.name, c.instructor) AS instructor
+             FROM courses c LEFT JOIN faculty f ON f.id = c.faculty_id WHERE c.id = $1`,
+            [id]
+        );
+        if (!rows[0]) return res.status(404).json({ message: "Course not found." });
+        return res.status(200).json({ ...rows[0], id: Number(rows[0].id), credits: Number(rows[0].credits) });
     }
 
-    return res.status(200).json(course);
-}
-
-function updateCourse(
-    id: number,
-    body: any,
-    db: ReturnType<typeof getDB>,
-    res: NextApiResponse
-) {
-    const index = db.courses.findIndex((c) => c.id === id);
-
-    if (index === -1) {
-        return res.status(404).json({ message: "Course not found" });
+    if (user.role !== "SUPER_ADMIN") {
+        return res.status(403).json({ message: "Only a Super Admin can modify courses." });
     }
 
-    const existingCourse = db.courses[index];
-    const parsed = courseSchema.partial().safeParse(body);
-
-    if (!parsed.success) {
-        return res.status(400).json({
-            message: "Invalid payload",
-            errors: parsed.error.flatten().fieldErrors
-        });
+    if (req.method === "PUT") {
+        const parsed = courseSchema.partial().safeParse(req.body);
+        if (!parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+            return res.status(400).json({ message: "Provide at least one valid course field." });
+        }
+        const current = await getPool().query(
+            "SELECT id, code, name, credits, department, instructor FROM courses WHERE id = $1",
+            [id]
+        );
+        if (!current.rows[0]) return res.status(404).json({ message: "Course not found." });
+        const updated = { ...current.rows[0], ...parsed.data };
+        const facultyResult = updated.instructor
+            ? await getPool().query("SELECT id FROM faculty WHERE name = $1 ORDER BY id LIMIT 1", [updated.instructor])
+            : { rows: [] };
+        await getPool().query(
+            `UPDATE courses SET code = $1, name = $2, credits = $3, department = $4,
+                    instructor = $5, faculty_id = $6
+             WHERE id = $7`,
+            [updated.code, updated.name, updated.credits, updated.department, updated.instructor ?? null,
+                facultyResult.rows[0]?.id ?? null, id]
+        );
+        await writeAuditLog(user.id, "course.updated", "course", id, { fields: Object.keys(parsed.data) });
+        const { rows } = await getPool().query(
+            "SELECT id, code, name, credits, department, instructor FROM courses WHERE id = $1",
+            [id]
+        );
+        const row = rows[0];
+        return res.status(200).json({ ...row, id: Number(row.id), credits: Number(row.credits) });
     }
 
-    const updatedCourse = {
-        ...existingCourse,
-        ...parsed.data,
-        id // Ensure ID remains unchanged
-    };
-
-    db.courses[index] = updatedCourse;
-
-    return res.status(200).json(updatedCourse);
-}
-
-function deleteCourse(id: number, db: ReturnType<typeof getDB>, res: NextApiResponse) {
-    const index = db.courses.findIndex((c) => c.id === id);
-
-    if (index === -1) {
-        return res.status(404).json({ message: "Course not found" });
+    if (req.method === "DELETE") {
+        const { rows } = await getPool().query(
+            `SELECT EXISTS (SELECT 1 FROM courses WHERE id = $1) AS record_exists,
+                    EXISTS (SELECT 1 FROM enrollments WHERE course_id = $1) AS has_enrollments`,
+            [id]
+        );
+        if (!Boolean(rows[0]?.record_exists)) return res.status(404).json({ message: "Course not found." });
+        if (Boolean(rows[0].has_enrollments)) {
+            return res.status(409).json({ message: "This course has enrollment history and cannot be deleted." });
+        }
+        await getPool().query("DELETE FROM courses WHERE id = $1", [id]);
+        await writeAuditLog(user.id, "course.deleted", "course", id);
+        return res.status(204).end();
     }
 
-    db.courses.splice(index, 1);
-
-    return res.status(204).end();
+    res.setHeader("Allow", "GET, PUT, DELETE");
+    return res.status(405).end();
 }

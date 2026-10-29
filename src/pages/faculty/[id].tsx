@@ -1,6 +1,7 @@
-import { getDB } from "@/lib/mock-db";
 import { toast } from "react-hot-toast";
 import { GetServerSideProps } from "next";
+import { getPool } from "@/lib/database";
+import { getAuthenticatedUser } from "@/lib/auth";
 import { useState } from "react";
 import { useRouter } from "next/router";
 import { Faculty } from "@/types/faculty";
@@ -12,6 +13,7 @@ import DetailLayout from "@/components/layout/DetailLayout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { UserCheck, Mail, Phone, MapPin, Briefcase, Award, Trash2, Edit3, ShieldCheck, User } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 
 interface Props {
     faculty: Faculty | null;
@@ -19,6 +21,7 @@ interface Props {
 }
 
 export default function FacultyDetailPage({ faculty, error }: Props) {
+    const { user } = useAuth();
     const router = useRouter();
     const [isEditing, setIsEditing] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -70,7 +73,7 @@ export default function FacultyDetailPage({ faculty, error }: Props) {
         }
     };
 
-    const actions = (
+    const actions = user?.role === "SUPER_ADMIN" ? (
         <>
             <button
                 onClick={() => setIsEditing(true)}
@@ -87,7 +90,7 @@ export default function FacultyDetailPage({ faculty, error }: Props) {
                 Terminate
             </button>
         </>
-    );
+    ) : null;
 
     return (
         <DetailLayout
@@ -264,13 +267,24 @@ export default function FacultyDetailPage({ faculty, error }: Props) {
 }
 
 export const getServerSideProps: GetServerSideProps<Props> = async (context) => {
-    const { id } = context.params!;
-    const db = getDB();
-    const facultyId = Number(id);
-
-    const faculty = db.faculty.find(f => f.id === facultyId);
-
-    if (!faculty) {
+    context.res.setHeader("Cache-Control", "private, no-store");
+    const user = await getAuthenticatedUser(context.req);
+    if (!user) {
+        return { redirect: { destination: "/login", permanent: false } };
+    }
+    if (user.mustChangePassword) {
+        return { redirect: { destination: "/change-password", permanent: false } };
+    }
+    const facultyId = Number(context.params?.id);
+    if (!Number.isSafeInteger(facultyId) || facultyId < 1) return { notFound: true };
+    if (user.role !== "SUPER_ADMIN" && (user.role !== "FACULTY" || user.facultyId !== facultyId)) {
+        return { notFound: true };
+    }
+    const { rows } = await getPool().query(
+        "SELECT id, name, email, department, specialization, phone FROM faculty WHERE id = $1",
+        [facultyId]
+    );
+    if (!rows[0]) {
         return {
             props: {
                 faculty: null,
@@ -280,6 +294,15 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
     }
 
     return {
-        props: { faculty }
+        props: {
+            faculty: {
+                id: Number(rows[0].id),
+                name: rows[0].name,
+                email: rows[0].email,
+                department: rows[0].department,
+                specialization: rows[0].specialization,
+                phone: rows[0].phone ?? undefined
+            }
+        }
     };
 };

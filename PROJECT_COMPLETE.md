@@ -1,8 +1,8 @@
-# 🎉 Academic Management Dashboard - COMPLETE!
+# Academic Management Dashboard - Historical Implementation Notes
 
-## ✅ PROJECT STATUS: PRODUCTION-READY
+> This document is a historical project snapshot, not a production-readiness guarantee. The current app includes student, course, faculty, and enrollment CRUD, authentication, and role-based authorization. See [README.md](./README.md) for the verified current scope and deployment limitations.
 
-Congratulations! You now have a **fully functional, production-grade Academic Management System** with complete CRUD operations for both Students and Courses, plus a beautiful dashboard.
+The project has CRUD workflows for students, courses, faculty, and enrollments, plus a dashboard. Runtime data is stored in MySQL; see the README for database configuration and known limitations.
 
 ---
 
@@ -318,7 +318,7 @@ This project demonstrates:
 If you want to take it further:
 
 1. **Authentication** - Add login/logout with NextAuth
-2. **Database** - Replace mock DB with PostgreSQL/MongoDB
+2. **Database** - Runtime persistence now uses MySQL; see the README for setup and migration steps.
 3. **Charts** - Add Recharts for GPA distribution
 4. **Export** - CSV export functionality
 5. **Faculty Module** - Add third entity
