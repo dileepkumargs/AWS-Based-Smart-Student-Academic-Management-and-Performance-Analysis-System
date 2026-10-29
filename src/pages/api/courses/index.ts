@@ -6,19 +6,19 @@ import { requireUser, writeAuditLog } from "@/lib/auth";
 
 const courseSelect = `
     SELECT c.id, c.code, c.name, c.credits, c.department,
-           COALESCE(f.name, c.instructor) AS instructor
+           COALESCE(f.name, c.instructor) AS instructor, c.faculty_id AS facultyId
     FROM courses c
     LEFT JOIN faculty f ON f.id = c.faculty_id
     WHERE ($1 = 'SUPER_ADMIN'
-        OR ($1 = 'FACULTY' AND c.faculty_id = $3)
+        OR $1 = 'FACULTY'
         OR ($1 = 'STUDENT' AND EXISTS (
             SELECT 1 FROM enrollments e
             WHERE e.course_id = c.id AND e.student_id = $2 AND e.status <> 'dropped'
         )))
-      AND ($4 = '' OR LOWER(c.code) LIKE CONCAT('%', LOWER($4), '%')
-           OR LOWER(c.name) LIKE CONCAT('%', LOWER($4), '%'))
-      AND ($5 = '' OR c.department = $5)
-      AND ($6 IS NULL OR c.credits = $6)
+      AND ($3 = '' OR LOWER(c.code) LIKE CONCAT('%', LOWER($3), '%')
+           OR LOWER(c.name) LIKE CONCAT('%', LOWER($3), '%'))
+      AND ($4 = '' OR LOWER(c.department) LIKE CONCAT('%', LOWER($4), '%'))
+      AND ($5 IS NULL OR c.credits = $5)
 `;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -31,16 +31,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const department = getQueryString(req, "department");
         const credits = getQueryString(req, "credits");
         const creditsFilter = credits && /^\d+$/.test(credits) ? Number(credits) : null;
-        const values = [user.role, user.studentId, user.facultyId, search, department, creditsFilter] as const;
+        const values = [user.role, user.studentId, search, department, creditsFilter] as const;
         const [result, total] = await Promise.all([
             getPool().query(
-                `${courseSelect} ORDER BY c.code LIMIT $7 OFFSET $8`,
+                `${courseSelect} ORDER BY c.code LIMIT $6 OFFSET $7`,
                 [...values, limit, offset]
             ),
             getRecordCount(`SELECT COUNT(*) AS total FROM (${courseSelect}) matching`, [...values])
         ]);
         return res.status(200).json({
-            data: result.rows.map(row => ({ ...row, id: Number(row.id), credits: Number(row.credits) })),
+            data: result.rows.map(row => ({
+                ...row,
+                id: Number(row.id),
+                credits: Number(row.credits),
+                facultyId: row.facultyId === null ? null : Number(row.facultyId)
+            })),
             meta: { total, page, limit }
         });
     }

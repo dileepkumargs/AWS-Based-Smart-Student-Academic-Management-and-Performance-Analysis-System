@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import EnrollmentTable from "@/components/tables/EnrollmentTable";
 import EnrollmentForm from "@/components/forms/EnrollmentForm";
@@ -11,6 +11,7 @@ import { CourseService } from "@/services/course.service";
 import { EnrollmentFormData } from "@/lib/validators";
 import { exportToCSV } from "@/lib/csv-utils";
 import { useAuth } from "@/lib/auth-context";
+import axios from "axios";
 
 export default function EnrollmentsPage() {
     const { user } = useAuth();
@@ -23,12 +24,7 @@ export default function EnrollmentsPage() {
 
     const limit = 10;
 
-    useEffect(() => {
-        fetchEnrollments();
-        fetchStudentsAndCourses();
-    }, [page]);
-
-    async function fetchEnrollments() {
+    const fetchEnrollments = useCallback(async () => {
         setLoading(true);
         try {
             const res = await EnrollmentService.list({ page, limit });
@@ -39,9 +35,9 @@ export default function EnrollmentsPage() {
         } finally {
             setLoading(false);
         }
-    }
+    }, [limit, page]);
 
-    async function fetchStudentsAndCourses() {
+    const fetchStudentsAndCourses = useCallback(async () => {
         try {
             const [studentsRes, coursesRes] = await Promise.all([
                 StudentService.list({ page: 1, limit: 1000 }),
@@ -52,19 +48,44 @@ export default function EnrollmentsPage() {
         } catch (error) {
             console.error("Failed to fetch students/courses:", error);
         }
-    }
+    }, []);
 
-    async function handleCreateEnrollment(data: EnrollmentFormData) {
+    async function handleCreateEnrollment(data: EnrollmentFormData): Promise<boolean> {
         try {
             await EnrollmentService.create(data);
             toast.success("Student enrolled successfully!");
-            setPage(1);
-            fetchEnrollments();
+            if (page !== 1) {
+                setPage(1);
+            } else {
+                await fetchEnrollments();
+            }
+            return true;
         } catch (error) {
             console.error(error);
-            toast.error("Failed to enroll student.");
+            const responseData = axios.isAxiosError<{ message?: string; errors?: Record<string, string[]> }>(error)
+                ? error.response?.data
+                : undefined;
+            const fieldErrors = responseData?.errors
+                ? Object.entries(responseData.errors)
+                    .flatMap(([field, messages]) => messages.map(message => `${field}: ${message}`))
+                    .join("; ")
+                : "";
+            toast.error(fieldErrors || responseData?.message || "Failed to enroll student.");
+            return false;
         }
     }
+
+    useEffect(() => {
+        // Fetching data synchronizes this view with the persisted enrollment records.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void fetchEnrollments();
+    }, [fetchEnrollments]);
+
+    useEffect(() => {
+        // Fetching data synchronizes the form options with current database records.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void fetchStudentsAndCourses();
+    }, [fetchStudentsAndCourses]);
 
     async function handleDelete(id: number) {
         if (confirm("Are you sure you want to delete this enrollment?")) {

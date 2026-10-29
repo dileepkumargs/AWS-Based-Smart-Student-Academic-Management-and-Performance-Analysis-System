@@ -17,7 +17,7 @@ The dashboard employs a custom-crafted design system focused on visual hierarchy
 ## 🛠️ Core Capabilities
 
 ### 🏢 Faculty & Personnel Management
-- **Role-protected dashboard**: Faculty can access assigned course rosters and grade tools.
+- **Role-protected dashboard**: Faculty can access assigned course rosters and grade tools, plus the institution-wide student directory with audited profile updates.
 - **Professional Portfolios**: Detailed identity panels with verification badges and contact portals.
 - **Service Termination Flow**: Integrated modal-based management for personnel records.
 
@@ -25,6 +25,7 @@ The dashboard employs a custom-crafted design system focused on visual hierarchy
 - **Live Registry**: Real-time course tracking with credit-unit visualization.
 - **Class Rosters**: Instant access to student enrollment history per course.
 - **Statistics Engine**: Visualize total enrollment, completion rates, and leanings at a glance.
+- **Faculty enrollment management**: Faculty can enroll students in courses assigned to their profile, update grades/status, and cancel active enrollments.
 
 ### 👤 Student Information System
 - **Profile Archiving**: Comprehensive academic transcripts and GPA tracking.
@@ -50,7 +51,7 @@ The `db.json` file remains a migration seed, not the live system of record. The 
 
 ### **Verified scope and current limitations**
 - Three sign-in choices are provided: Student, Faculty, and Super Admin. Admin-created Student/Faculty accounts must change their initial password; administrators can deactivate accounts and issue one-time temporary password resets.
-- Super Admin can manage institutional student/course/faculty/enrollment records, accounts, and audit logs. Faculty access is limited to assigned courses and their rosters, and faculty can update grades only for their assigned enrollments. Students can read only their own linked profile and enrollments.
+- Super Admin can manage institutional student/course/faculty/enrollment records, accounts, and audit logs. Faculty can view and update the existing student profile fields in the institution-wide directory, and view the shared course catalog. Faculty can edit course names and departments only for courses assigned to their profile; course codes, credits, and assignments remain protected. Faculty can create enrollments only for courses assigned to their profile, update enrollment grades/status, and cancel active enrollments; these actions are audited. Students can read only their own linked profile and enrollments, which are shown in the student dashboard.
 - Academic GPA and grade data are descriptive records, not predictions. Attendance, assignments, notifications, MFA, ML predictions, recovery automation, and full profile self-service are not implemented.
 - This application has not been penetration tested. Configure TLS, database network restrictions, encrypted backups, IAM, and operational monitoring before production use.
 

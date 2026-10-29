@@ -11,6 +11,8 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { BookOpen, FlaskConical, CheckCircle2, ChevronRight, LayoutDashboard, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import FacultyStudentDirectory from "@/components/dashboard/FacultyStudentDirectory";
+import FacultyCourseDirectory from "@/components/dashboard/FacultyCourseDirectory";
 
 export default function FacultyDashboard() {
     const { user } = useAuth();
@@ -40,15 +42,15 @@ export default function FacultyDashboard() {
         return () => { active = false; };
     }, [fetchInitialData]);
 
-    const fetchMyCourses = useCallback(async (facultyName: string) => {
+    const fetchMyCourses = useCallback(async (facultyId: number) => {
         const res = await CourseService.list({ page: 1, limit: 1000 });
-        return res.data.filter(course => course.instructor === facultyName);
+        return res.data.filter(course => course.facultyId === facultyId);
     }, []);
 
     useEffect(() => {
         if (!selectedFaculty) return;
         let active = true;
-        fetchMyCourses(selectedFaculty.name).then(data => {
+        fetchMyCourses(selectedFaculty.id).then(data => {
             if (active) setMyCourses(data);
         }).catch(error => {
             console.error("Failed to fetch my courses:", error);
@@ -131,6 +133,13 @@ export default function FacultyDashboard() {
                     </div>
                 </div>
             </div>
+
+            {user?.role === "FACULTY" && (
+                <>
+                    <FacultyCourseDirectory />
+                    <FacultyStudentDirectory />
+                </>
+            )}
 
             {selectedFaculty && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">

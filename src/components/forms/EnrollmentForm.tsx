@@ -5,7 +5,7 @@ import { Student } from "@/types/student";
 import { Course } from "@/types/course";
 
 interface Props {
-    onSubmit: (data: EnrollmentFormData) => Promise<void>;
+    onSubmit: (data: EnrollmentFormData) => Promise<boolean>;
     students: Student[];
     courses: Course[];
     initialData?: Partial<EnrollmentFormData>;
@@ -23,13 +23,20 @@ export default function EnrollmentForm({ onSubmit, students, courses, initialDat
             enrolledDate: new Date().toISOString().split('T')[0],
             status: 'enrolled',
             semester: 'Spring',
-            year: 2025
+            year: new Date().getFullYear()
         }
     });
 
     const onSubmitHandler = async (data: EnrollmentFormData) => {
-        await onSubmit(data);
-        if (!initialData) reset();
+        const saved = await onSubmit(data);
+        if (saved && !initialData) {
+            reset({
+                enrolledDate: new Date().toISOString().slice(0, 10),
+                status: "enrolled",
+                semester: "Spring",
+                year: new Date().getFullYear()
+            });
+        }
     };
 
     return (

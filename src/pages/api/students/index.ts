@@ -5,18 +5,21 @@ import { getPagination, getQueryString, getRecordCount } from "@/lib/academic-ac
 import { requireUser, writeAuditLog } from "@/lib/auth";
 
 const studentSelect = `
-    SELECT s.id, s.name, s.year, s.course, s.gpa
+    SELECT s.id, s.name, s.year, s.course, s.gpa, u.email,
+           CASE
+               WHEN u.id IS NULL THEN 'No account'
+               WHEN u.is_active = TRUE THEN 'Active'
+               ELSE 'Inactive'
+           END AS accountStatus
     FROM students s
+    LEFT JOIN users u ON u.id = s.user_id
     WHERE ($1 = 'SUPER_ADMIN'
         OR ($1 = 'STUDENT' AND s.user_id = $2)
-        OR ($1 = 'FACULTY' AND EXISTS (
-            SELECT 1 FROM enrollments e
-            JOIN courses c ON c.id = e.course_id
-            WHERE e.student_id = s.id AND c.faculty_id = $3
-        )))
-      AND ($4 = '' OR LOWER(s.name) LIKE CONCAT('%', LOWER($4), '%') OR CAST(s.id AS CHAR) = $4)
-      AND ($5 IS NULL OR s.year = $5)
-      AND ($6 = '' OR s.course = $6)
+        OR $1 = 'FACULTY')
+      AND ($3 = '' OR LOWER(s.name) LIKE CONCAT('%', LOWER($3), '%')
+           OR CAST(s.id AS CHAR) = $3 OR LOWER(COALESCE(u.email, '')) LIKE CONCAT('%', LOWER($3), '%'))
+      AND ($4 IS NULL OR s.year = $4)
+      AND ($5 = '' OR LOWER(s.course) LIKE CONCAT('%', LOWER($5), '%'))
 `;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -29,10 +32,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const year = getQueryString(req, "year");
         const course = getQueryString(req, "course");
         const yearFilter = year && /^\d{1,4}$/.test(year) ? Number(year) : null;
-        const values = [user.role, user.id, user.facultyId, search, yearFilter, course] as const;
+        const values = [user.role, user.id, search, yearFilter, course] as const;
         const [result, total] = await Promise.all([
             getPool().query(
-                `${studentSelect} ORDER BY s.id LIMIT $7 OFFSET $8`,
+                `${studentSelect} ORDER BY s.id LIMIT $6 OFFSET $7`,
                 [...values, limit, offset]
             ),
             getRecordCount(

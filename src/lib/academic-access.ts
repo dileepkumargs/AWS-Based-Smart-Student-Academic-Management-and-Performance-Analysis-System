@@ -5,17 +5,7 @@ import type { AuthUser } from "@/lib/auth";
 export async function canAccessStudent(user: AuthUser, studentId: number) {
     if (user.role === "SUPER_ADMIN") return true;
     if (user.role === "STUDENT") return user.studentId === studentId;
-    if (user.facultyId === null) return false;
-
-    const { rows } = await getPool().query(
-        `SELECT EXISTS (
-            SELECT 1 FROM enrollments e
-            JOIN courses c ON c.id = e.course_id
-            WHERE e.student_id = $1 AND c.faculty_id = $2
-         ) AS allowed`,
-        [studentId, user.facultyId]
-    );
-    return Boolean(rows[0].allowed);
+    return user.role === "FACULTY";
 }
 
 export async function canAccessCourse(user: AuthUser, courseId: number) {

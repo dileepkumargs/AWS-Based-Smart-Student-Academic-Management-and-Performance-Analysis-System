@@ -22,12 +22,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json({ ...rows[0], id: Number(rows[0].id), year: Number(rows[0].year), gpa: Number(rows[0].gpa) });
     }
 
-    if (user.role !== "SUPER_ADMIN") {
-        return res.status(403).json({ message: "Only a Super Admin can modify student records." });
-    }
-
     if (req.method === "PUT") {
-        const parsed = studentSchema.partial().safeParse(req.body);
+        if (user.role !== "SUPER_ADMIN" && user.role !== "FACULTY") {
+            return res.status(403).json({ message: "You cannot modify student records." });
+        }
+        if (!(await canAccessStudent(user, id))) {
+            return res.status(404).json({ message: "Student not found." });
+        }
+        const parsed = studentSchema.partial().strict().safeParse(req.body);
         if (!parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
             return res.status(400).json({ message: "Provide at least one valid student field." });
         }
@@ -39,13 +41,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
              WHERE id = $5`,
             [updated.name, updated.year, updated.course, updated.gpa, id]
         );
-        await writeAuditLog(user.id, "student.updated", "student", id, { fields: Object.keys(parsed.data) });
+        await writeAuditLog(user.id, "student.updated", "student", id, {
+            fields: Object.keys(parsed.data),
+            actorRole: user.role
+        });
         const { rows } = await getPool().query("SELECT id, name, year, course, gpa FROM students WHERE id = $1", [id]);
         const row = rows[0];
         return res.status(200).json({ ...row, id: Number(row.id), year: Number(row.year), gpa: Number(row.gpa) });
     }
 
     if (req.method === "DELETE") {
+        if (user.role !== "SUPER_ADMIN") {
+            return res.status(403).json({ message: "Only a Super Admin can delete student records." });
+        }
         const { rows } = await getPool().query(
             `SELECT
                 EXISTS (SELECT 1 FROM enrollments WHERE student_id = $1) AS has_enrollments,

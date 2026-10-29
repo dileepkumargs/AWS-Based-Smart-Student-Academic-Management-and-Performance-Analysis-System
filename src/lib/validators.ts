@@ -24,6 +24,13 @@ export const courseSchema = z.object({
 
 export type CourseFormData = z.infer<typeof courseSchema>;
 
+export const facultyCourseUpdateSchema = courseSchema.pick({
+    name: true,
+    department: true
+});
+
+export type FacultyCourseUpdateData = z.infer<typeof facultyCourseUpdateSchema>;
+
 // Faculty Schema
 export const facultySchema = z.object({
     name: z.string().min(3, "Name must be at least 3 characters"),
@@ -39,11 +46,28 @@ export type FacultyFormData = z.infer<typeof facultySchema>;
 export const enrollmentSchema = z.object({
     studentId: z.number().int().positive("Student ID must be a positive integer"),
     courseId: z.number().int().positive("Course ID must be a positive integer"),
-    grade: z.string().optional(),
-    semester: z.string().min(1, "Semester is required"),
-    year: z.number().int().min(2020).max(2030),
+    grade: z.string().max(8).nullable().optional(),
+    semester: z.string().trim().min(1, "Semester is required").max(32),
+    year: z.number().int().min(1900).max(2200),
     status: z.enum(['enrolled', 'completed', 'dropped']),
-    enrolledDate: z.string()
+    enrolledDate: z.iso.date("Enter a valid enrollment date.")
 });
 
 export type EnrollmentFormData = z.infer<typeof enrollmentSchema>;
+
+export const facultyEnrollmentCreateSchema = enrollmentSchema.pick({
+    studentId: true,
+    courseId: true,
+    semester: true,
+    year: true,
+    enrolledDate: true
+});
+
+export type FacultyEnrollmentCreateData = z.infer<typeof facultyEnrollmentCreateSchema>;
+
+export const facultyEnrollmentUpdateSchema = z.object({
+    grade: z.string().max(8).nullable().optional(),
+    status: z.enum(["enrolled", "completed", "dropped"]).optional()
+}).strict();
+
+export type FacultyEnrollmentUpdateData = z.infer<typeof facultyEnrollmentUpdateSchema>;

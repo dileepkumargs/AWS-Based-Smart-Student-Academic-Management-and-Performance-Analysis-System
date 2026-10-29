@@ -1,6 +1,18 @@
 import axios from "axios";
 import { Enrollment, EnrollmentWithDetails } from "@/types/enrollment";
-import { EnrollmentFormData } from "@/lib/validators";
+import { EnrollmentFormData, FacultyEnrollmentCreateData, FacultyEnrollmentUpdateData } from "@/lib/validators";
+
+async function listAll(params: { studentId?: number; courseId?: number }): Promise<EnrollmentWithDetails[]> {
+    const firstPage = await EnrollmentService.list({ ...params, page: 1, limit: 100 });
+    const pageCount = Math.ceil(firstPage.meta.total / firstPage.meta.limit);
+    if (pageCount <= 1) return firstPage.data;
+    const remainingPages = await Promise.all(
+        Array.from({ length: pageCount - 1 }, (_, index) =>
+            EnrollmentService.list({ ...params, page: index + 2, limit: 100 })
+        )
+    );
+    return firstPage.data.concat(...remainingPages.map(result => result.data));
+}
 
 export interface EnrollmentListResponse {
     data: EnrollmentWithDetails[];
@@ -27,12 +39,12 @@ export const EnrollmentService = {
         return res.data;
     },
 
-    create: async (data: EnrollmentFormData): Promise<Enrollment> => {
+    create: async (data: EnrollmentFormData | FacultyEnrollmentCreateData): Promise<Enrollment> => {
         const res = await axios.post("/api/enrollments", data);
         return res.data;
     },
 
-    update: async (id: number, data: Partial<EnrollmentFormData>): Promise<Enrollment> => {
+    update: async (id: number, data: Partial<EnrollmentFormData> | FacultyEnrollmentUpdateData): Promise<Enrollment> => {
         const res = await axios.put(`/api/enrollments/${id}`, data);
         return res.data;
     },
@@ -42,12 +54,10 @@ export const EnrollmentService = {
     },
 
     getByStudent: async (studentId: number): Promise<EnrollmentWithDetails[]> => {
-        const res = await axios.get(`/api/enrollments?studentId=${studentId}&limit=1000`);
-        return res.data.data;
+        return listAll({ studentId });
     },
 
     getByCourse: async (courseId: number): Promise<EnrollmentWithDetails[]> => {
-        const res = await axios.get(`/api/enrollments?courseId=${courseId}&limit=1000`);
-        return res.data.data;
+        return listAll({ courseId });
     }
 };

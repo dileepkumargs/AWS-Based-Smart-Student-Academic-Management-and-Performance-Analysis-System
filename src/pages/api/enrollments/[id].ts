@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPool } from "@/lib/database";
-import { enrollmentSchema } from "@/lib/validators";
+import { enrollmentSchema, facultyEnrollmentUpdateSchema } from "@/lib/validators";
 import { canAccessEnrollment } from "@/lib/academic-access";
 import { requireUser, writeAuditLog } from "@/lib/auth";
 
@@ -40,11 +40,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!(await canAccessEnrollment(user, id))) {
             return res.status(user.role === "FACULTY" ? 403 : 404).json({ message: "Enrollment not found." });
         }
-        const parsed = enrollmentSchema.partial().safeParse(req.body);
+        const parsed = user.role === "FACULTY"
+            ? facultyEnrollmentUpdateSchema.safeParse(req.body)
+            : enrollmentSchema.partial().strict().safeParse(req.body);
         if (!parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
             return res.status(400).json({ message: "Provide at least one valid enrollment field." });
         }
-        if (user.role === "FACULTY" && Object.keys(parsed.data).some(key => key !== "grade" && key !== "status")) {
+        const updateData: {
+            studentId?: number;
+            courseId?: number;
+            grade?: string | null;
+            semester?: string;
+            year?: number;
+            status?: "enrolled" | "completed" | "dropped";
+            enrolledDate?: string;
+        } = user.role === "FACULTY"
+            ? parsed.data
+            : parsed.data;
+        if (user.role === "FACULTY" && Object.keys(updateData).some(key => key !== "grade" && key !== "status")) {
             return res.status(403).json({ message: "Faculty may only update grades and completion status." });
         }
         const current = await getPool().query(
@@ -54,12 +67,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             [id]
         );
         if (!current.rows[0]) return res.status(404).json({ message: "Enrollment not found." });
-        const updated = { ...current.rows[0], ...parsed.data };
+        const updated = { ...current.rows[0], ...updateData };
         if (user.role === "FACULTY" && (
             Number(updated.studentId) !== Number(current.rows[0].studentId) ||
             Number(updated.courseId) !== Number(current.rows[0].courseId)
         )) {
             return res.status(403).json({ message: "Faculty cannot move an enrollment between students or courses." });
+        }
+        if (user.role === "FACULTY" && current.rows[0].status !== "enrolled" &&
+            updateData.status !== undefined && updateData.status !== current.rows[0].status) {
+            return res.status(409).json({ message: "Cancelled or completed enrollments cannot change status." });
         }
         await getPool().query(
             `UPDATE enrollments SET student_id = $1, course_id = $2, grade = $3,
@@ -69,8 +86,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 updated.year, updated.status, updated.enrolledDate, id]
         );
         await writeAuditLog(user.id, "enrollment.updated", "enrollment", id, {
-            fields: Object.keys(parsed.data),
-            gradeChanged: parsed.data.grade !== undefined
+            fields: Object.keys(updateData),
+            gradeChanged: updateData.grade !== undefined
         });
         const { rows } = await getPool().query(
             `SELECT id, student_id AS studentId, course_id AS courseId, grade,

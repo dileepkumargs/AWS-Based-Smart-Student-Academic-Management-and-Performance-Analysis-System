@@ -21,6 +21,7 @@ export default function Header() {
         : user.role === "FACULTY"
             ? [
                 { name: "Faculty Dashboard", href: "/faculty/dashboard" },
+                { name: "Student Course Enrollment", href: "/faculty/enrollments" },
                 { name: "My Students", href: "/students" },
                 { name: "My Courses", href: "/courses" },
                 { name: "Class Enrollments", href: "/enrollments" }

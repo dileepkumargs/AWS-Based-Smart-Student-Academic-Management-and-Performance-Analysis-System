@@ -11,6 +11,8 @@ export interface CourseListResponse {
     };
 }
 
+export type FacultyCourseUpdate = Pick<Course, "name" | "department">;
+
 export const CourseService = {
     list: async (params: {
         page: number;
@@ -33,7 +35,7 @@ export const CourseService = {
         return res.data;
     },
 
-    update: async (id: number, data: CourseFormData): Promise<Course> => {
+    update: async (id: number, data: CourseFormData | Partial<FacultyCourseUpdate>): Promise<Course> => {
         const res = await axios.put(`/api/courses/${id}`, data);
         return res.data;
     },

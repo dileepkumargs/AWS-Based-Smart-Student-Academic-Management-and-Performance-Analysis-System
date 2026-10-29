@@ -12,6 +12,9 @@ export interface Enrollment {
 // Extended type with populated student and course info
 export interface EnrollmentWithDetails extends Enrollment {
     studentName?: string;
+    studentEmail?: string | null;
+    studentYear?: number;
     courseName?: string;
     courseCode?: string;
+    courseDepartment?: string;
 }
