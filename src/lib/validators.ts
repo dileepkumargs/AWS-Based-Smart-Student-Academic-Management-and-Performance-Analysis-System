@@ -55,19 +55,56 @@ export const enrollmentSchema = z.object({
 
 export type EnrollmentFormData = z.infer<typeof enrollmentSchema>;
 
-export const facultyEnrollmentCreateSchema = enrollmentSchema.pick({
-    studentId: true,
-    courseId: true,
-    semester: true,
-    year: true,
-    enrolledDate: true
-});
-
-export type FacultyEnrollmentCreateData = z.infer<typeof facultyEnrollmentCreateSchema>;
-
 export const facultyEnrollmentUpdateSchema = z.object({
     grade: z.string().max(8).nullable().optional(),
     status: z.enum(["enrolled", "completed", "dropped"]).optional()
 }).strict();
 
 export type FacultyEnrollmentUpdateData = z.infer<typeof facultyEnrollmentUpdateSchema>;
+
+export const attendanceStatusSchema = z.enum(["present", "absent", "late"]);
+
+export const attendanceMarkSchema = z.object({
+    courseId: z.number().int().positive(),
+    semester: z.string().trim().min(1).max(32),
+    year: z.number().int().min(1900).max(2200),
+    attendanceDate: z.iso.date(),
+    records: z.array(z.object({
+        studentId: z.number().int().positive(),
+        status: attendanceStatusSchema
+    }).strict()).min(1).max(500)
+}).strict();
+
+export const announcementSchema = z.object({
+    courseId: z.number().int().positive(),
+    title: z.string().trim().min(1).max(180),
+    description: z.string().trim().min(1).max(10000),
+    category: z.enum(["general_notice", "examination_schedule", "assignment", "important_notice"]),
+    publicationDate: z.iso.date(),
+    expiryDate: z.iso.date().nullable(),
+    isPinned: z.boolean()
+}).strict().refine(
+    data => data.expiryDate === null || data.expiryDate >= data.publicationDate,
+    { path: ["expiryDate"], message: "Expiry date must be on or after publication date." }
+);
+
+export const timetableEntrySchema = z.object({
+    courseId: z.number().int().positive(),
+    semester: z.string().trim().min(1).max(32),
+    year: z.number().int().min(1900).max(2200),
+    scheduleType: z.enum(["class", "examination"]),
+    dayOfWeek: z.enum(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]).nullable(),
+    eventDate: z.iso.date().nullable(),
+    title: z.string().trim().max(180).nullable(),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid start time."),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, "Enter a valid end time."),
+    location: z.string().trim().min(1).max(120)
+}).strict().refine(
+    data => data.scheduleType === "class"
+        ? data.dayOfWeek !== null && data.eventDate === null
+        : data.dayOfWeek === null && data.eventDate !== null,
+    { path: ["scheduleType"], message: "Class schedules require a weekday; examinations require a date." }
+).refine(
+    data => data.endTime > data.startTime,
+    { path: ["endTime"], message: "End time must be after start time." }
+);

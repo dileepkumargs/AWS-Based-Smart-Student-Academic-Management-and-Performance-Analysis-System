@@ -34,10 +34,19 @@ export async function canAccessEnrollment(user: AuthUser, enrollmentId: number) 
     );
     if (!rows[0]) return false;
     if (user.role === "STUDENT") return user.studentId === Number(rows[0].student_id);
+    return user.role === "FACULTY";
+}
+
+export async function canEditEnrollment(user: AuthUser, enrollmentId: number) {
+    if (user.role !== "FACULTY") return canAccessEnrollment(user, enrollmentId);
     if (user.facultyId === null) return false;
     const { rows: courses } = await getPool().query(
-        "SELECT EXISTS (SELECT 1 FROM courses WHERE id = $1 AND faculty_id = $2) AS allowed",
-        [rows[0].course_id, user.facultyId]
+        `SELECT EXISTS (
+            SELECT 1 FROM enrollments e
+            JOIN courses c ON c.id = e.course_id
+            WHERE e.id = $1 AND c.faculty_id = $2
+        ) AS allowed`,
+        [enrollmentId, user.facultyId]
     );
     return Boolean(courses[0].allowed);
 }

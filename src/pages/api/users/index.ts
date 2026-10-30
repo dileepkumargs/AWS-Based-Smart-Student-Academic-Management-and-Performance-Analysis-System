@@ -11,7 +11,7 @@ const createUserSchema = z.discriminatedUnion("role", [
         password: z.string().min(12).max(256),
         name: z.string().min(2).max(120),
         year: z.number().int().min(1900).max(2200).optional(),
-        course: z.string().min(2).max(120).optional(),
+        courseId: z.number().int().positive().optional(),
         gpa: z.number().min(0).max(4).optional(),
         studentId: z.number().int().positive().optional()
     }),
@@ -28,7 +28,7 @@ const createUserSchema = z.discriminatedUnion("role", [
 ]).superRefine((data, context) => {
     if (data.role === "STUDENT" && !data.studentId) {
         if (data.year === undefined) context.addIssue({ code: "custom", path: ["year"], message: "Academic year is required for a new student profile." });
-        if (!data.course) context.addIssue({ code: "custom", path: ["course"], message: "Program is required for a new student profile." });
+        if (!data.courseId) context.addIssue({ code: "custom", path: ["courseId"], message: "Select a course for the new student profile." });
         if (data.gpa === undefined) context.addIssue({ code: "custom", path: ["gpa"], message: "GPA is required for a new student profile." });
     }
 });
@@ -105,10 +105,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 if (profile.rowCount === 0) throw new Error("STUDENT_PROFILE_UNAVAILABLE");
                 profileId = parsed.data.studentId;
             } else {
+                const course = await client.query(
+                    "SELECT id, name FROM courses WHERE id = $1",
+                    [parsed.data.courseId]
+                );
+                if (!course.rows[0]) throw new Error("STUDENT_COURSE_NOT_FOUND");
                 const profile = await client.query(
-                    `INSERT INTO students (user_id, name, year, course, gpa)
-                     VALUES ($1, $2, $3, $4, $5)`,
-                    [user.id, parsed.data.name, parsed.data.year!, parsed.data.course!, parsed.data.gpa!]
+                    `INSERT INTO students (user_id, name, year, course, course_id, gpa)
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                    [user.id, parsed.data.name, parsed.data.year!, course.rows[0].name,
+                        parsed.data.courseId, parsed.data.gpa!]
                 );
                 profileId = profile.insertId;
             }
@@ -155,6 +161,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await client.rollback();
         if (error instanceof Error && error.message.endsWith("_PROFILE_UNAVAILABLE")) {
             return res.status(409).json({ message: "That academic profile is already linked to an account or does not exist." });
+        }
+        if (error instanceof Error && error.message === "STUDENT_COURSE_NOT_FOUND") {
+            return res.status(400).json({ message: "The selected course does not exist." });
         }
         if ((error as { code?: string }).code === "ER_DUP_ENTRY") {
             return res.status(409).json({ message: "An account with that email already exists." });

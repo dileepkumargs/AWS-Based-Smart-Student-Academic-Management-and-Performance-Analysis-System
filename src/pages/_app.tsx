@@ -54,7 +54,7 @@ export default function App({ Component, pageProps }: AppProps) {
           return;
         }
         if (authenticatedUser.role === "FACULTY" &&
-            !["/", "/faculty", "/faculty/[id]", "/faculty/dashboard", "/faculty/enrollments", "/students", "/students/[id]", "/courses", "/courses/[id]", "/enrollments", "/change-password"].includes(router.pathname)) {
+            !["/", "/faculty", "/faculty/[id]", "/faculty/dashboard", "/students", "/students/[id]", "/courses", "/courses/[id]", "/enrollments", "/attendance", "/announcements", "/timetable", "/change-password"].includes(router.pathname)) {
           void router.replace("/faculty/dashboard");
           return;
         }
@@ -77,7 +77,7 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <AuthContext.Provider value={authValue}>
       <div className="flex min-h-screen bg-white">
-        <div className="flex-1 bg-gray-50">
+        <div className="min-w-0 flex-1 bg-gray-50">
           {!isPublicRoute && canRender && <Header />}
           {canRender ? (
             <Component {...pageProps} />

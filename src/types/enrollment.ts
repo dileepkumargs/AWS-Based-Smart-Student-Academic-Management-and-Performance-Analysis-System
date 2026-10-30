@@ -17,4 +17,5 @@ export interface EnrollmentWithDetails extends Enrollment {
     courseName?: string;
     courseCode?: string;
     courseDepartment?: string;
+    courseFacultyId?: number | null;
 }

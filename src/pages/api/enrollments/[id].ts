@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPool } from "@/lib/database";
 import { enrollmentSchema, facultyEnrollmentUpdateSchema } from "@/lib/validators";
-import { canAccessEnrollment } from "@/lib/academic-access";
+import { canAccessEnrollment, canEditEnrollment } from "@/lib/academic-access";
 import { requireUser, writeAuditLog } from "@/lib/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -17,10 +17,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { rows } = await getPool().query(
             `SELECT e.id, e.student_id AS studentId, e.course_id AS courseId, e.grade,
                     e.semester, e.year, e.status, DATE_FORMAT(e.enrolled_date, '%Y-%m-%d') AS enrolledDate,
-                    s.name AS studentName, c.name AS courseName, c.code AS courseCode
+                    s.name AS studentName, u.email AS studentEmail, c.name AS courseName, c.code AS courseCode,
+                    c.department AS courseDepartment, c.faculty_id AS courseFacultyId
              FROM enrollments e
              JOIN students s ON s.id = e.student_id
              JOIN courses c ON c.id = e.course_id
+             LEFT JOIN users u ON u.id = s.user_id
              WHERE e.id = $1`,
             [id]
         );
@@ -31,13 +33,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             id: Number(row.id),
             studentId: Number(row.studentId),
             courseId: Number(row.courseId),
-            year: Number(row.year)
+            year: Number(row.year),
+            courseFacultyId: row.courseFacultyId === null ? null : Number(row.courseFacultyId)
         });
     }
 
     if (req.method === "PUT") {
         if (user.role === "STUDENT") return res.status(403).json({ message: "Students cannot modify enrollment records." });
-        if (!(await canAccessEnrollment(user, id))) {
+        if (!(await canEditEnrollment(user, id))) {
             return res.status(user.role === "FACULTY" ? 403 : 404).json({ message: "Enrollment not found." });
         }
         const parsed = user.role === "FACULTY"

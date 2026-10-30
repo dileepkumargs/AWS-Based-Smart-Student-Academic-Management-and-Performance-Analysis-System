@@ -2,6 +2,9 @@ import { EnrollmentWithDetails } from "@/types/enrollment";
 
 interface Props {
     enrollments: EnrollmentWithDetails[];
+    onView: (enrollment: EnrollmentWithDetails) => void;
+    onEdit?: (enrollment: EnrollmentWithDetails) => void;
+    canEdit?: (enrollment: EnrollmentWithDetails) => boolean;
     onDelete?: (id: number) => void;
 }
 
@@ -24,94 +27,117 @@ const statusColors: Record<string, string> = {
     'dropped': 'bg-gray-100 text-gray-800 border-gray-300'
 };
 
-export default function EnrollmentTable({ enrollments, onDelete }: Props) {
+export default function EnrollmentTable({ enrollments, onView, onEdit, canEdit, onDelete }: Props) {
     if (enrollments.length === 0) {
         return (
-            <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 p-12 text-center">
+            <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-md">
                 <div className="flex flex-col items-center">
-                    <div className="p-6 bg-purple-100 rounded-full mb-4">
-                        <svg className="w-16 h-16 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="mb-3 rounded-full bg-purple-100 p-4">
+                        <svg className="h-10 w-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-800 mb-2">No Enrollments Found</h3>
-                    <p className="text-gray-600">Start by creating a new enrollment above</p>
+                    <h3 className="mb-1 text-lg font-semibold text-gray-800">No Enrollments Found</h3>
+                    <p className="text-sm text-gray-600">Start by creating a new enrollment above</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-xl border-2 border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+            <div className="overscroll-x-contain overflow-x-auto">
+                <table className="w-full min-w-[1240px] border-collapse text-xs">
                     <thead className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
                         <tr>
-                            <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Student</th>
-                            <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Course</th>
-                            <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Semester</th>
-                            <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Year</th>
-                            <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Grade</th>
-                            <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Status</th>
-                            {onDelete && <th className="px-6 py-4 text-center text-sm font-bold uppercase tracking-wider">Actions</th>}
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Student Name</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Student ID</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Email</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Course Code</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Course Name</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Semester</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Academic Year</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Grade</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Status</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Enrolled Date</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                         {enrollments.map((enrollment, index) => (
                             <tr
                                 key={enrollment.id}
-                                className={`hover:bg-purple-50 transition-colors duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                    }`}
+                                className={`hover:bg-purple-50 transition-colors duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                             >
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-2 bg-blue-100 rounded-lg">
-                                            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                            </svg>
-                                        </div>
-                                        <span className="font-medium text-gray-900">{enrollment.studentName || `Student #${enrollment.studentId}`}</span>
-                                    </div>
+                                <td className="whitespace-nowrap px-3 py-2.5 font-medium text-gray-900">
+                                    <span className="block max-w-36 truncate" title={enrollment.studentName}>
+                                        {enrollment.studentName || `Student #${enrollment.studentId}`}
+                                    </span>
                                 </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col">
-                                        <span className="font-semibold text-gray-900">{enrollment.courseCode || `Course #${enrollment.courseId}`}</span>
-                                        <span className="text-sm text-gray-600">{enrollment.courseName}</span>
-                                    </div>
+                                <td className="whitespace-nowrap px-3 py-2.5 font-medium text-gray-900">#{enrollment.studentId}</td>
+                                <td className="px-3 py-2.5 text-gray-700">
+                                    <span className="block max-w-44 truncate" title={enrollment.studentEmail || undefined}>
+                                        {enrollment.studentEmail || "Not available"}
+                                    </span>
                                 </td>
-                                <td className="px-6 py-4">
-                                    <span className="text-gray-900 font-medium">{enrollment.semester}</span>
+                                <td className="whitespace-nowrap px-3 py-2.5 font-semibold text-gray-900">
+                                    {enrollment.courseCode || `Course #${enrollment.courseId}`}
                                 </td>
-                                <td className="px-6 py-4">
-                                    <span className="text-gray-900 font-medium">{enrollment.year}</span>
+                                <td className="px-3 py-2.5 text-gray-700">
+                                    <span className="block max-w-40 truncate" title={enrollment.courseName || undefined}>
+                                        {enrollment.courseName || "Not available"}
+                                    </span>
                                 </td>
-                                <td className="px-6 py-4">
+                                <td className="whitespace-nowrap px-3 py-2.5 font-medium text-gray-900">{enrollment.semester}</td>
+                                <td className="whitespace-nowrap px-3 py-2.5 font-medium text-gray-900">{enrollment.year}</td>
+                                <td className="whitespace-nowrap px-3 py-2.5">
                                     {enrollment.grade ? (
-                                        <span className={`px-3 py-1 rounded-lg text-sm font-bold border-2 ${gradeColors[enrollment.grade] || 'bg-gray-100 text-gray-800 border-gray-300'}`}>
+                                        <span className={`rounded-md border px-2 py-1 font-bold ${gradeColors[enrollment.grade] || 'bg-gray-100 text-gray-800 border-gray-300'}`}>
                                             {enrollment.grade}
                                         </span>
                                     ) : (
                                         <span className="text-gray-400 italic">Not graded</span>
                                     )}
                                 </td>
-                                <td className="px-6 py-4">
-                                    <span className={`px-3 py-1 rounded-lg text-sm font-semibold border-2 capitalize ${statusColors[enrollment.status]}`}>
+                                <td className="whitespace-nowrap px-3 py-2.5">
+                                    <span className={`rounded-md border px-2 py-1 font-semibold capitalize ${statusColors[enrollment.status]}`}>
                                         {enrollment.status}
                                     </span>
                                 </td>
-                                {onDelete && <td className="px-6 py-4">
-                                    <div className="flex items-center justify-center gap-2">
+                                <td className="whitespace-nowrap px-3 py-2.5 text-gray-700">
+                                    {enrollment.enrolledDate
+                                        ? new Date(`${enrollment.enrolledDate}T00:00:00`).toLocaleDateString()
+                                        : "Not available"}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2.5">
+                                    <div className="flex items-center justify-center gap-1">
                                         <button
-                                            onClick={() => onDelete(enrollment.id)}
-                                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors duration-200 hover:scale-110 transform"
-                                            title="Delete"
+                                            type="button"
+                                            onClick={() => onView(enrollment)}
+                                            className="rounded-md bg-blue-100 px-2 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-200"
                                         >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
+                                            View
                                         </button>
+                                        {onEdit && (!canEdit || canEdit(enrollment)) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onEdit(enrollment)}
+                                                className="rounded-md bg-amber-100 px-2 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-200"
+                                            >
+                                                Edit
+                                            </button>
+                                        )}
+                                        {onDelete && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onDelete(enrollment.id)}
+                                                className="rounded-md bg-red-100 px-2 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-200"
+                                            >
+                                                Delete
+                                            </button>
+                                        )}
                                     </div>
-                                </td>}
+                                </td>
                             </tr>
                         ))}
                     </tbody>

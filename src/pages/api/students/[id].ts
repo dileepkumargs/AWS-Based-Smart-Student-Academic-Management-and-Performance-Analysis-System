@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(user.role === "STUDENT" ? 404 : 403).json({ message: "Student not found." });
         }
         const { rows } = await getPool().query(
-            "SELECT id, name, year, course, gpa FROM students WHERE id = $1",
+            "SELECT id, name, year, course, course_id AS courseId, gpa FROM students WHERE id = $1",
             [id]
         );
         if (!rows[0]) return res.status(404).json({ message: "Student not found." });
@@ -33,21 +33,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
             return res.status(400).json({ message: "Provide at least one valid student field." });
         }
-        const existing = await getPool().query("SELECT id, name, year, course, gpa FROM students WHERE id = $1", [id]);
+        const existing = await getPool().query("SELECT id, name, year, course, course_id AS courseId, gpa FROM students WHERE id = $1", [id]);
         if (!existing.rows[0]) return res.status(404).json({ message: "Student not found." });
         const updated = { ...existing.rows[0], ...parsed.data };
         await getPool().query(
-            `UPDATE students SET name = $1, year = $2, course = $3, gpa = $4
+            `UPDATE students SET name = $1, year = $2, course = $3,
+                 course_id = IF($3 = $6, $7, NULL), gpa = $4
              WHERE id = $5`,
-            [updated.name, updated.year, updated.course, updated.gpa, id]
+            [updated.name, updated.year, updated.course, updated.gpa, id,
+                existing.rows[0].course, existing.rows[0].courseId]
         );
         await writeAuditLog(user.id, "student.updated", "student", id, {
             fields: Object.keys(parsed.data),
             actorRole: user.role
         });
-        const { rows } = await getPool().query("SELECT id, name, year, course, gpa FROM students WHERE id = $1", [id]);
+        const { rows } = await getPool().query("SELECT id, name, year, course, course_id AS courseId, gpa FROM students WHERE id = $1", [id]);
         const row = rows[0];
-        return res.status(200).json({ ...row, id: Number(row.id), year: Number(row.year), gpa: Number(row.gpa) });
+        return res.status(200).json({
+            ...row,
+            id: Number(row.id),
+            year: Number(row.year),
+            courseId: row.courseId === null ? null : Number(row.courseId),
+            gpa: Number(row.gpa)
+        });
     }
 
     if (req.method === "DELETE") {

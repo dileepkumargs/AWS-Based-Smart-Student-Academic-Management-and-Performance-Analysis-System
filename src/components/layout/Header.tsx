@@ -16,15 +16,20 @@ export default function Header() {
             { name: "Students", href: "/students" },
             { name: "Courses", href: "/courses" },
             { name: "Faculty", href: "/faculty" },
-            { name: "Enrollments", href: "/enrollments" }
+            { name: "Enrollments", href: "/enrollments" },
+            { name: "Attendance Management", href: "/attendance" },
+            { name: "Announcements", href: "/announcements" },
+            { name: "Timetable Management", href: "/timetable" }
         ]
         : user.role === "FACULTY"
             ? [
                 { name: "Faculty Dashboard", href: "/faculty/dashboard" },
-                { name: "Student Course Enrollment", href: "/faculty/enrollments" },
                 { name: "My Students", href: "/students" },
                 { name: "My Courses", href: "/courses" },
-                { name: "Class Enrollments", href: "/enrollments" }
+                { name: "Enrollments", href: "/enrollments" },
+                { name: "Attendance Management", href: "/attendance" },
+                { name: "Announcements", href: "/announcements" },
+                { name: "Timetable Management", href: "/timetable" }
             ]
             : [{ name: "My Dashboard", href: "/student/dashboard" }];
     links.push({ name: "Password", href: "/change-password" });
@@ -41,12 +46,12 @@ export default function Header() {
     }
 
     return (
-        <header className="sticky top-0 z-50 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+        <header className="sticky top-0 z-50 flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 sm:px-5">
             <Link href={user.role === "STUDENT" ? "/student/dashboard" : user.role === "FACULTY" ? "/faculty/dashboard" : "/super-admin/dashboard"} className="flex items-center gap-2 text-lg font-bold text-slate-900 hover:text-emerald-700">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-xl font-black text-white">A</span>
                 <span className="hidden sm:inline">Academic Dashboard</span>
             </Link>
-            <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-600 sm:gap-6">
+            <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-2.5 text-xs font-semibold text-slate-600 sm:gap-4 sm:text-sm">
                 {links.map(item => (
                     <Link
                         key={item.href}

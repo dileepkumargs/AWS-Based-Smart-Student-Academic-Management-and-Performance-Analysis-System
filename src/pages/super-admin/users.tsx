@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { UserPlus, KeyRound, UserX, UserCheck, Search } from "lucide-react";
+import { CourseService } from "@/services/course.service";
+import type { Course } from "@/types/course";
 
 type AccountRole = "STUDENT" | "FACULTY";
 interface Account {
@@ -18,7 +20,7 @@ interface AccountForm {
     password: string;
     name: string;
     year: number;
-    course: string;
+    courseId: string;
     gpa: number;
     department: string;
     specialization: string;
@@ -32,6 +34,9 @@ interface UnlinkedStudent {
     name: string;
     year: number;
     course: string;
+    courseId: number | null;
+    courseCode: string | null;
+    courseName: string | null;
     gpa: number;
 }
 
@@ -50,7 +55,7 @@ const initialForm: AccountForm = {
     password: "",
     name: "",
     year: new Date().getFullYear(),
-    course: "",
+    courseId: "",
     gpa: 0,
     department: "",
     specialization: "",
@@ -68,6 +73,11 @@ export default function SuperAdminUsersPage() {
     const [credentialMessage, setCredentialMessage] = useState("");
     const [unlinkedStudents, setUnlinkedStudents] = useState<UnlinkedStudent[]>([]);
     const [unlinkedFaculty, setUnlinkedFaculty] = useState<UnlinkedFaculty[]>([]);
+    const [courses, setCourses] = useState<Course[]>([]);
+    const [profilesLoading, setProfilesLoading] = useState(true);
+    const [coursesLoading, setCoursesLoading] = useState(true);
+    const [profilesError, setProfilesError] = useState("");
+    const [coursesError, setCoursesError] = useState("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -110,19 +120,66 @@ export default function SuperAdminUsersPage() {
 
     useEffect(() => {
         const role = form.role;
-        fetch(`/api/users/profiles?role=${role}`, { cache: "no-store" })
-            .then(async response => {
-                if (!response.ok) throw new Error("Unable to load unlinked profiles.");
-                return response.json() as Promise<{ data: UnlinkedStudent[] | UnlinkedFaculty[] }>;
-            })
-            .then(result => {
-                if (role === "STUDENT") setUnlinkedStudents(result.data as UnlinkedStudent[]);
-                else setUnlinkedFaculty(result.data as UnlinkedFaculty[]);
-            })
-            .catch(error => {
-                console.error("Failed to load unlinked academic profiles:", error);
-                toast.error("Unable to load existing profiles.");
-            });
+        let active = true;
+        async function loadProfiles<T>(url: string): Promise<T[]> {
+            const firstResponse = await fetch(`${url}&page=1&limit=100`, { cache: "no-store" });
+            if (!firstResponse.ok) throw new Error("Unable to load unlinked profiles.");
+            const firstPage = await firstResponse.json() as { data: T[]; meta: { total: number; limit: number } };
+            const pageCount = Math.ceil(firstPage.meta.total / firstPage.meta.limit);
+            if (pageCount <= 1) return firstPage.data;
+            const otherPages = await Promise.all(
+                Array.from({ length: pageCount - 1 }, async (_, index) => {
+                    const response = await fetch(`${url}&page=${index + 2}&limit=100`, { cache: "no-store" });
+                    if (!response.ok) throw new Error("Unable to load unlinked profiles.");
+                    return await response.json() as { data: T[] };
+                })
+            );
+            return firstPage.data.concat(...otherPages.map(pageResult => pageResult.data));
+        }
+        async function loadCourses() {
+            const firstPage = await CourseService.list({ page: 1, limit: 100 });
+            const pageCount = Math.ceil(firstPage.meta.total / firstPage.meta.limit);
+            if (pageCount <= 1) return firstPage.data;
+            const otherPages = await Promise.all(
+                Array.from({ length: pageCount - 1 }, (_, index) =>
+                    CourseService.list({ page: index + 2, limit: 100 })
+                )
+            );
+            return firstPage.data.concat(...otherPages.map(pageResult => pageResult.data));
+        }
+
+        // The form starts in the Student role; switching roles uses the cached faculty profile list.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setProfilesLoading(true);
+        if (role === "STUDENT") {
+            setProfilesError("");
+            setCoursesLoading(true);
+            setCoursesError("");
+            loadProfiles<UnlinkedStudent>("/api/users/profiles?role=STUDENT")
+                .then(records => { if (active) setUnlinkedStudents(records); })
+                .catch(error => {
+                    console.error("Failed to load unlinked student profiles:", error);
+                    if (active) setProfilesError("Student profiles could not be loaded.");
+                })
+                .finally(() => { if (active) setProfilesLoading(false); });
+            loadCourses()
+                .then(records => { if (active) setCourses(records); })
+                .catch(error => {
+                    console.error("Failed to load course options:", error);
+                    if (active) setCoursesError("Courses could not be loaded.");
+                })
+                .finally(() => { if (active) setCoursesLoading(false); });
+        } else {
+            setProfilesError("");
+            loadProfiles<UnlinkedFaculty>("/api/users/profiles?role=FACULTY")
+                .then(records => { if (active) setUnlinkedFaculty(records); })
+                .catch(error => {
+                    console.error("Failed to load unlinked faculty profiles:", error);
+                    if (active) setProfilesError("Faculty profiles could not be loaded.");
+                })
+                .finally(() => { if (active) setProfilesLoading(false); });
+        }
+        return () => { active = false; };
     }, [form.role]);
 
     async function createAccount(event: FormEvent<HTMLFormElement>) {
@@ -134,7 +191,7 @@ export default function SuperAdminUsersPage() {
                 role: form.role, email: form.email, password: form.password, name: form.name,
                 ...(form.studentId
                     ? { studentId: Number(form.studentId) }
-                    : { year: Number(form.year), course: form.course, gpa: Number(form.gpa) })
+                    : { year: Number(form.year), courseId: Number(form.courseId), gpa: Number(form.gpa) })
             }
             : {
                 role: form.role, email: form.email, password: form.password, name: form.name,
@@ -205,7 +262,7 @@ export default function SuperAdminUsersPage() {
                 </div>
                 <form onSubmit={createAccount} className="grid gap-5 md:grid-cols-2">
                     <label className="text-sm font-bold text-slate-700">Account role
-                        <select value={form.role} onChange={event => setForm(value => ({ ...value, role: event.target.value as AccountRole }))} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3">
+                        <select value={form.role} onChange={event => setForm({ ...initialForm, role: event.target.value as AccountRole })} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3">
                             <option value="STUDENT">Student</option>
                             <option value="FACULTY">Faculty</option>
                         </select>
@@ -224,29 +281,63 @@ export default function SuperAdminUsersPage() {
                             <label className="text-sm font-bold text-slate-700">Link an existing student profile (optional)
                                 <select value={form.studentId} onChange={event => {
                                     const profile = unlinkedStudents.find(student => student.id === Number(event.target.value));
+                                    const matchingCourse = profile && courses.find(course =>
+                                        course.id === profile.courseId ||
+                                        course.name.toLowerCase() === profile.course.toLowerCase() ||
+                                        course.code.toLowerCase() === profile.course.toLowerCase()
+                                    );
                                     setForm(value => ({
                                         ...value,
                                         studentId: event.target.value,
-                                        ...(profile ? { name: profile.name, year: profile.year, course: profile.course, gpa: profile.gpa } : {})
+                                        ...(profile
+                                            ? {
+                                                name: profile.name,
+                                                year: profile.year,
+                                                courseId: matchingCourse ? String(matchingCourse.id) : "",
+                                                gpa: profile.gpa
+                                            }
+                                            : { name: "", year: new Date().getFullYear(), courseId: "", gpa: 0 })
                                     }));
                                 }} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3">
                                     <option value="">Create a new student profile</option>
-                                    {unlinkedStudents.map(profile => <option key={profile.id} value={profile.id}>#{profile.id} — {profile.name}</option>)}
+                                    {unlinkedStudents.map(profile => <option key={profile.id} value={profile.id}>{profile.name} — Student ID / USN #{profile.id}</option>)}
                                 </select>
                             </label>
+                            {profilesLoading && <p className="text-sm font-medium text-slate-500">Loading student profiles…</p>}
+                            {profilesError && <p role="alert" className="text-sm font-medium text-rose-700">{profilesError}</p>}
+                            {!profilesLoading && !profilesError && unlinkedStudents.length === 0 && (
+                                <p className="text-sm text-slate-500">No unlinked student profiles are available. Profiles already linked to accounts are excluded to prevent duplicate links.</p>
+                            )}
                             {!form.studentId && (
                                 <>
                                     <label className="text-sm font-bold text-slate-700">Academic year
                                         <input required type="number" min={1900} max={2200} value={form.year} onChange={event => setForm(value => ({ ...value, year: Number(event.target.value) }))} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3" />
                                     </label>
                                     <label className="text-sm font-bold text-slate-700">Program / course
-                                        <input required minLength={2} maxLength={120} value={form.course} onChange={event => setForm(value => ({ ...value, course: event.target.value }))} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3" />
+                                        <select required value={form.courseId} disabled={coursesLoading || courses.length === 0} onChange={event => setForm(value => ({ ...value, courseId: event.target.value }))} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 disabled:bg-slate-100">
+                                            <option value="">{coursesLoading ? "Loading courses…" : "Select a course"}</option>
+                                            {courses.map(course => <option key={course.id} value={course.id}>{course.code} — {course.name}</option>)}
+                                        </select>
+                                        {coursesError && <span role="alert" className="mt-1 block text-xs font-medium text-rose-700">{coursesError}</span>}
+                                        {!coursesLoading && !coursesError && courses.length === 0 && <span className="mt-1 block text-xs font-medium text-slate-500">No courses are available in the catalog.</span>}
                                     </label>
                                     <label className="text-sm font-bold text-slate-700">Current GPA
                                         <input required type="number" min={0} max={4} step="0.01" value={form.gpa} onChange={event => setForm(value => ({ ...value, gpa: Number(event.target.value) }))} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3" />
                                     </label>
                                 </>
                             )}
+                            {form.studentId && (() => {
+                                const profile = unlinkedStudents.find(student => student.id === Number(form.studentId));
+                                if (!profile) return null;
+                                const course = courses.find(option => option.id === profile.courseId);
+                                return (
+                                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-slate-700 md:col-span-2">
+                                        <p className="font-bold text-slate-900">Existing student profile · ID / USN #{profile.id}</p>
+                                        <p className="mt-1">Academic year: {profile.year} · GPA: {profile.gpa.toFixed(2)}</p>
+                                        <p>Program / course: {course ? `${course.code} — ${course.name}` : profile.course}</p>
+                                    </div>
+                                );
+                            })()}
                         </>
                     ) : (
                         <>
@@ -281,7 +372,7 @@ export default function SuperAdminUsersPage() {
                         </>
                     )}
                     <div className="md:col-span-2">
-                        <button disabled={saving} className="rounded-xl bg-emerald-700 px-6 py-3 font-bold text-white hover:bg-emerald-800 disabled:opacity-60">{saving ? "Creating..." : "Create account"}</button>
+                        <button disabled={saving || (form.role === "STUDENT" && !form.studentId && (coursesLoading || courses.length === 0))} className="rounded-xl bg-emerald-700 px-6 py-3 font-bold text-white hover:bg-emerald-800 disabled:opacity-60">{saving ? "Creating..." : "Create account"}</button>
                     </div>
                 </form>
             </section>

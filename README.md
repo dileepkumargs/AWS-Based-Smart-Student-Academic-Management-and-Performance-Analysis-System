@@ -25,11 +25,13 @@ The dashboard employs a custom-crafted design system focused on visual hierarchy
 - **Live Registry**: Real-time course tracking with credit-unit visualization.
 - **Class Rosters**: Instant access to student enrollment history per course.
 - **Statistics Engine**: Visualize total enrollment, completion rates, and leanings at a glance.
-- **Faculty enrollment management**: Faculty can enroll students in courses assigned to their profile, update grades/status, and cancel active enrollments.
+- **Faculty enrollment management**: Faculty can enroll any registered student in any available course, subject to duplicate enrollment validation.
+- **Academic activity**: Faculty and Super Admins can manage attendance, course announcements, and weekly class/examination timetables. Faculty management is scoped to their assigned courses.
 
 ### 👤 Student Information System
 - **Profile Archiving**: Comprehensive academic transcripts and GPA tracking.
 - **Enrollment History**: Dynamic tables showing course status, semester cycles, and verified grades.
+- **Academic activity**: Students can view their attendance history and course percentages, announcements for enrolled courses, and term-matched weekly timetables and upcoming examinations.
 - **Search & Filter**: Advanced filtering by academic year and department.
 
 ## 🏗️ Technical Architecture
@@ -51,8 +53,8 @@ The `db.json` file remains a migration seed, not the live system of record. The 
 
 ### **Verified scope and current limitations**
 - Three sign-in choices are provided: Student, Faculty, and Super Admin. Admin-created Student/Faculty accounts must change their initial password; administrators can deactivate accounts and issue one-time temporary password resets.
-- Super Admin can manage institutional student/course/faculty/enrollment records, accounts, and audit logs. Faculty can view and update the existing student profile fields in the institution-wide directory, and view the shared course catalog. Faculty can edit course names and departments only for courses assigned to their profile; course codes, credits, and assignments remain protected. Faculty can create enrollments only for courses assigned to their profile, update enrollment grades/status, and cancel active enrollments; these actions are audited. Students can read only their own linked profile and enrollments, which are shown in the student dashboard.
-- Academic GPA and grade data are descriptive records, not predictions. Attendance, assignments, notifications, MFA, ML predictions, recovery automation, and full profile self-service are not implemented.
+- Super Admin can manage institutional student/course/faculty/enrollment records, accounts, audit logs, attendance, announcements, and timetables. Faculty can view and update the existing student profile fields in the institution-wide directory and view the shared course catalog. Faculty can edit course names and departments only for courses assigned to their profile; course codes, credits, and assignments remain protected. Faculty can create enrollments for any student and course, update enrollment grades/status, and cancel active enrollments; these actions are audited. Faculty attendance, announcement, and timetable management remains scoped to assigned courses. Students can read only their own linked profile and enrollment/activity records.
+- Academic GPA and grade data are descriptive records, not predictions. Automated announcement notifications, MFA, ML predictions, recovery automation, and full profile self-service are not implemented.
 - This application has not been penetration tested. Configure TLS, database network restrictions, encrypted backups, IAM, and operational monitoring before production use.
 
 ### **Architecture Decisions**
@@ -135,7 +137,7 @@ Required environment variables:
 - `DATABASE_URL`: MySQL URL, for example `mysql://academic_app:password@127.0.0.1:3306/academic_dashboard`. URL-encode special characters in the username or password. Create the database before running migrations, and use a least-privilege database user.
 - `DATABASE_SSL`: set `true` for TLS connections to managed MySQL (including Amazon RDS for MySQL); local MySQL can use `false`.
 
-The migration imports existing seed data without overwriting conflicting IDs. Review the data snapshot and database before running it; make a backup first.
+The migration imports existing seed data without overwriting conflicting IDs and applies the academic activity schema in `migrations/002_academic_activity.sql`. Review the data snapshot and database before running it; make a backup first.
 
 ### Production Build
 ```bash

@@ -1,9 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getPool } from "@/lib/database";
-import {
-    enrollmentSchema,
-    facultyEnrollmentCreateSchema
-} from "@/lib/validators";
+import { enrollmentSchema } from "@/lib/validators";
 import { getPagination, getQueryString, getRecordCount } from "@/lib/academic-access";
 import { requireUser } from "@/lib/auth";
 
@@ -11,16 +8,22 @@ const enrollmentSelect = `
     SELECT e.id, e.student_id AS studentId, e.course_id AS courseId, e.grade,
            e.semester, e.year, e.status, DATE_FORMAT(e.enrolled_date, '%Y-%m-%d') AS enrolledDate,
            s.name AS studentName, u.email AS studentEmail, s.year AS studentYear,
-           c.name AS courseName, c.code AS courseCode, c.department AS courseDepartment
+           c.name AS courseName, c.code AS courseCode, c.department AS courseDepartment,
+           c.faculty_id AS courseFacultyId
     FROM enrollments e
     JOIN students s ON s.id = e.student_id
     JOIN courses c ON c.id = e.course_id
     LEFT JOIN users u ON u.id = s.user_id
     WHERE ($1 = 'SUPER_ADMIN'
         OR ($1 = 'STUDENT' AND e.student_id = $2)
-        OR ($1 = 'FACULTY' AND c.faculty_id = $3))
-      AND ($4 IS NULL OR e.student_id = $4)
-      AND ($5 IS NULL OR e.course_id = $5)
+        OR $1 = 'FACULTY')
+      AND ($3 IS NULL OR e.student_id = $3)
+      AND ($4 IS NULL OR e.course_id = $4)
+      AND ($5 = '' OR LOWER(s.name) LIKE CONCAT('%', LOWER($5), '%')
+           OR CAST(e.student_id AS CHAR) LIKE CONCAT('%', $5, '%'))
+      AND ($6 = '' OR e.semester = $6)
+      AND ($7 IS NULL OR e.year = $7)
+      AND ($8 = '' OR e.status = $8)
 `;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -31,11 +34,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { page, limit, offset } = getPagination(req);
         const studentQuery = getQueryString(req, "studentId");
         const courseQuery = getQueryString(req, "courseId");
+        const search = getQueryString(req, "search");
+        const semester = getQueryString(req, "semester");
+        const yearQuery = getQueryString(req, "year");
+        const status = getQueryString(req, "status");
         const studentId = /^\d+$/.test(studentQuery) ? Number(studentQuery) : null;
         const courseId = /^\d+$/.test(courseQuery) ? Number(courseQuery) : null;
-        const values = [user.role, user.studentId, user.facultyId, studentId, courseId] as const;
+        const year = /^\d{1,4}$/.test(yearQuery) ? Number(yearQuery) : null;
+        if (status && !["enrolled", "completed", "dropped"].includes(status)) {
+            return res.status(400).json({ message: "Invalid enrollment status filter." });
+        }
+        const values = [user.role, user.studentId, studentId, courseId, search, semester, year, status] as const;
         const [result, total] = await Promise.all([
-            getPool().query(`${enrollmentSelect} ORDER BY e.id LIMIT $6 OFFSET $7`, [...values, limit, offset]),
+            getPool().query(`${enrollmentSelect} ORDER BY e.id DESC LIMIT $9 OFFSET $10`, [...values, limit, offset]),
             getRecordCount(`SELECT COUNT(*) AS total FROM (${enrollmentSelect}) matching`, [...values])
         ]);
         return res.status(200).json({
@@ -45,7 +56,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 studentId: Number(row.studentId),
                 courseId: Number(row.courseId),
                 year: Number(row.year),
-                studentYear: Number(row.studentYear)
+                studentYear: Number(row.studentYear),
+                courseFacultyId: row.courseFacultyId === null ? null : Number(row.courseFacultyId)
             })),
             meta: { total, page, limit }
         });
@@ -66,7 +78,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         status: "enrolled" | "completed" | "dropped";
         enrolledDate: string;
     };
-    let enrollmentData: EnrollmentCreateRecord;
     const requestBody = req.body && typeof req.body === "object" && !Array.isArray(req.body)
         ? {
             ...req.body,
@@ -75,36 +86,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             year: typeof req.body.year === "string" ? Number(req.body.year) : req.body.year
         }
         : req.body;
-    if (user.role === "FACULTY") {
-        const parsed = facultyEnrollmentCreateSchema.safeParse(requestBody);
-        if (!parsed.success) {
-            return res.status(400).json({ message: "Invalid payload.", errors: parsed.error.flatten().fieldErrors });
-        }
-        enrollmentData = { ...parsed.data, grade: null, status: "enrolled" };
-    } else {
-        const parsed = enrollmentSchema.strict().safeParse(requestBody);
-        if (!parsed.success) {
-            return res.status(400).json({ message: "Invalid payload.", errors: parsed.error.flatten().fieldErrors });
-        }
-        enrollmentData = { ...parsed.data, grade: parsed.data.grade ?? null };
+    const parsed = enrollmentSchema.strict().safeParse(requestBody);
+    if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid payload.", errors: parsed.error.flatten().fieldErrors });
     }
+    const enrollmentData: EnrollmentCreateRecord = { ...parsed.data, grade: parsed.data.grade ?? null };
     const client = await getPool().connect();
     try {
         await client.beginTransaction();
-        if (user.role === "FACULTY") {
-            if (user.facultyId === null) {
-                await client.rollback();
-                return res.status(403).json({ message: "Your faculty account is not linked to an academic profile." });
-            }
-            const course = await client.query(
-                "SELECT id FROM courses WHERE id = $1 AND faculty_id = $2 FOR UPDATE",
-                [enrollmentData.courseId, user.facultyId]
-            );
-            if (!course.rows[0]) {
-                await client.rollback();
-                return res.status(403).json({ message: "You can only enroll students in courses assigned to you." });
-            }
-        }
         const student = await client.query(
             "SELECT id FROM students WHERE id = $1 FOR UPDATE",
             [enrollmentData.studentId]
@@ -141,7 +130,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             `SELECT e.id, e.student_id AS studentId, e.course_id AS courseId, e.grade,
                     e.semester, e.year, e.status, DATE_FORMAT(e.enrolled_date, '%Y-%m-%d') AS enrolledDate,
                     s.name AS studentName, u.email AS studentEmail, s.year AS studentYear,
-                    c.name AS courseName, c.code AS courseCode, c.department AS courseDepartment
+                    c.name AS courseName, c.code AS courseCode, c.department AS courseDepartment,
+                    c.faculty_id AS courseFacultyId
              FROM enrollments e
              JOIN students s ON s.id = e.student_id
              JOIN courses c ON c.id = e.course_id
@@ -155,7 +145,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             studentId: Number(rows[0].studentId),
             courseId: Number(rows[0].courseId),
             year: Number(rows[0].year),
-            studentYear: Number(rows[0].studentYear)
+            studentYear: Number(rows[0].studentYear),
+            courseFacultyId: rows[0].courseFacultyId === null ? null : Number(rows[0].courseFacultyId)
         };
         await client.query(
             `INSERT INTO audit_logs (actor_user_id, action, resource_type, resource_id, details)

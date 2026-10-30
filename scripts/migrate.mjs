@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import mysql from "mysql2/promise";
@@ -7,7 +7,7 @@ import nextEnv from "@next/env";
 const { loadEnvConfig } = nextEnv;
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 loadEnvConfig(root);
-const migrationPath = join(root, "migrations", "001_initial_schema.sql");
+const migrationDirectory = join(root, "migrations");
 const dataPath = process.env.ACADEMIC_DATA_FILE || join(root, "data", "db.json");
 
 if (!process.env.DATABASE_URL?.startsWith("mysql://")) {
@@ -50,7 +50,9 @@ async function loadSeed() {
 }
 
 try {
-  const migration = await readFile(migrationPath, "utf8");
+  const migrationNames = (await readdir(migrationDirectory))
+    .filter(name => /^\d+_.+\.sql$/.test(name))
+    .sort();
   const seed = await loadSeed();
   const connection = await pool.getConnection();
   try {
@@ -60,22 +62,31 @@ try {
          applied_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
        ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`
     );
-    const [appliedRows] = await connection.execute(
-      "SELECT version FROM schema_migrations WHERE version = ?",
-      ["001_mysql_initial_schema"]
-    );
-    if (appliedRows.length === 0) {
+    let initialSchemaWasApplied = false;
+    for (const name of migrationNames) {
+      const version = name === "001_initial_schema.sql"
+        ? "001_mysql_initial_schema"
+        : `${name.slice(0, -4)}_mysql`;
+      const [appliedRows] = await connection.execute(
+        "SELECT version FROM schema_migrations WHERE version = ?",
+        [version]
+      );
+      if (appliedRows.length > 0) continue;
+
+      const migration = await readFile(join(migrationDirectory, name), "utf8");
       for (const statement of migration.split(";").map(value => value.trim()).filter(Boolean)) {
         await connection.query(statement);
       }
       await connection.execute(
         "INSERT INTO schema_migrations (version) VALUES (?)",
-        ["001_mysql_initial_schema"]
+        [version]
       );
+      if (name.startsWith("001_")) initialSchemaWasApplied = true;
     }
 
-    await connection.beginTransaction();
-    try {
+    if (initialSchemaWasApplied) {
+      await connection.beginTransaction();
+      try {
       for (const student of seed.data.students ?? []) {
         const [existing] = await connection.execute("SELECT id FROM students WHERE id = ?", [student.id]);
         if (existing.length === 0) {
@@ -122,13 +133,14 @@ try {
         }
       }
 
-      await connection.commit();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
+        await connection.commit();
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      }
     }
 
-    console.log(`MySQL migration complete. Seed records imported from ${seed.path} when absent.`);
+    console.log(`MySQL migrations complete${initialSchemaWasApplied ? `. Seed records imported from ${seed.path} when absent.` : "."}`);
   } finally {
     connection.release();
   }

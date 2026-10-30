@@ -5,7 +5,7 @@ import { getPagination, getQueryString, getRecordCount } from "@/lib/academic-ac
 import { requireUser, writeAuditLog } from "@/lib/auth";
 
 const studentSelect = `
-    SELECT s.id, s.name, s.year, s.course, s.gpa, u.email,
+    SELECT s.id, s.name, s.year, s.course, s.course_id AS courseId, s.gpa, u.email,
            CASE
                WHEN u.id IS NULL THEN 'No account'
                WHEN u.is_active = TRUE THEN 'Active'
@@ -44,7 +44,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             )
         ]);
         return res.status(200).json({
-            data: result.rows.map(row => ({ ...row, id: Number(row.id), year: Number(row.year), gpa: Number(row.gpa) })),
+            data: result.rows.map(row => ({
+                ...row,
+                id: Number(row.id),
+                year: Number(row.year),
+                courseId: row.courseId === null ? null : Number(row.courseId),
+                gpa: Number(row.gpa)
+            })),
             meta: { total, page, limit }
         });
     }

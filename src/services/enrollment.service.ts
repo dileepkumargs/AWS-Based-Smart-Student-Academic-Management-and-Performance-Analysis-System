@@ -1,6 +1,6 @@
 import axios from "axios";
 import { Enrollment, EnrollmentWithDetails } from "@/types/enrollment";
-import { EnrollmentFormData, FacultyEnrollmentCreateData, FacultyEnrollmentUpdateData } from "@/lib/validators";
+import { EnrollmentFormData, FacultyEnrollmentUpdateData } from "@/lib/validators";
 
 async function listAll(params: { studentId?: number; courseId?: number }): Promise<EnrollmentWithDetails[]> {
     const firstPage = await EnrollmentService.list({ ...params, page: 1, limit: 100 });
@@ -23,13 +23,19 @@ export interface EnrollmentListResponse {
     };
 }
 
+export interface EnrollmentListParams {
+    page: number;
+    limit: number;
+    studentId?: number;
+    courseId?: number;
+    search?: string;
+    semester?: string;
+    year?: number;
+    status?: Enrollment["status"];
+}
+
 export const EnrollmentService = {
-    list: async (params: {
-        page: number;
-        limit: number;
-        studentId?: number;
-        courseId?: number;
-    }): Promise<EnrollmentListResponse> => {
+    list: async (params: EnrollmentListParams): Promise<EnrollmentListResponse> => {
         const res = await axios.get("/api/enrollments", { params });
         return res.data;
     },
@@ -39,7 +45,7 @@ export const EnrollmentService = {
         return res.data;
     },
 
-    create: async (data: EnrollmentFormData | FacultyEnrollmentCreateData): Promise<Enrollment> => {
+    create: async (data: EnrollmentFormData): Promise<Enrollment> => {
         const res = await axios.post("/api/enrollments", data);
         return res.data;
     },
