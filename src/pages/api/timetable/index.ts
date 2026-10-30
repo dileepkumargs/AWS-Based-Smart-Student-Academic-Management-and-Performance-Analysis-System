@@ -6,6 +6,7 @@ import { requireUser, writeAuditLog } from "@/lib/auth";
 
 const timetableSelect = `
     SELECT t.id, t.course_id AS courseId, c.code AS courseCode, c.name AS courseName,
+           c.branch AS courseBranch,
            t.faculty_id AS facultyId, f.name AS facultyName, t.semester, t.year,
            t.schedule_type AS scheduleType, t.day_of_week AS dayOfWeek,
            DATE_FORMAT(t.event_date, '%Y-%m-%d') AS eventDate,

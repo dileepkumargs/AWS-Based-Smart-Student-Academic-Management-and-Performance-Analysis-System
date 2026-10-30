@@ -137,7 +137,7 @@ Required environment variables:
 - `DATABASE_URL`: MySQL URL, for example `mysql://academic_app:password@127.0.0.1:3306/academic_dashboard`. URL-encode special characters in the username or password. Create the database before running migrations, and use a least-privilege database user.
 - `DATABASE_SSL`: set `true` for TLS connections to managed MySQL (including Amazon RDS for MySQL); local MySQL can use `false`.
 
-The migration imports existing seed data without overwriting conflicting IDs and applies the academic activity schema in `migrations/002_academic_activity.sql`. Review the data snapshot and database before running it; make a backup first.
+The migration imports existing seed data without overwriting conflicting IDs and applies the numbered SQL migrations in `migrations/`. This includes the enrollment branch and year-of-study fields. Review the data snapshot and database before running it; make a backup first.
 
 ### Production Build
 ```bash

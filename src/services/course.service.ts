@@ -19,6 +19,7 @@ export const CourseService = {
         limit: number;
         search?: string;
         department?: string;
+        branch?: string;
         credits?: number;
     }): Promise<CourseListResponse> => {
         const res = await axios.get("/api/courses", { params });

@@ -43,10 +43,19 @@ export async function canEditEnrollment(user: AuthUser, enrollmentId: number) {
     const { rows: courses } = await getPool().query(
         `SELECT EXISTS (
             SELECT 1 FROM enrollments e
-            JOIN courses c ON c.id = e.course_id
-            WHERE e.id = $1 AND c.faculty_id = $2
+            LEFT JOIN courses c ON c.id = e.course_id
+            WHERE e.id = $1 AND (
+                c.faculty_id = $2
+                OR (e.course_id IS NULL AND EXISTS (
+                    SELECT 1 FROM audit_logs a
+                    WHERE a.actor_user_id = $3
+                      AND a.action = 'enrollment.created'
+                      AND a.resource_type = 'enrollment'
+                      AND a.resource_id = CAST(e.id AS CHAR)
+                ))
+            )
         ) AS allowed`,
-        [enrollmentId, user.facultyId]
+        [enrollmentId, user.facultyId, user.id]
     );
     return Boolean(courses[0].allowed);
 }

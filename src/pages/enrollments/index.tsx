@@ -4,11 +4,10 @@ import EnrollmentTable from "@/components/tables/EnrollmentTable";
 import EnrollmentForm from "@/components/forms/EnrollmentForm";
 import { EnrollmentWithDetails } from "@/types/enrollment";
 import { Student } from "@/types/student";
-import { Course } from "@/types/course";
 import { EnrollmentService } from "@/services/enrollment.service";
 import { StudentService } from "@/services/student.service";
-import { CourseService } from "@/services/course.service";
 import { EnrollmentFormData } from "@/lib/validators";
+import { ENROLLMENT_BRANCHES, ENROLLMENT_STUDY_YEARS, getStudyYearLabel, isEnrollmentBranch } from "@/lib/enrollment-options";
 import { exportToCSV } from "@/lib/csv-utils";
 import { useAuth } from "@/lib/auth-context";
 import axios from "axios";
@@ -32,14 +31,14 @@ export default function EnrollmentsPage() {
     const { user } = useAuth();
     const [enrollments, setEnrollments] = useState<EnrollmentWithDetails[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
-    const [courses, setCourses] = useState<Course[]>([]);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(false);
     const [enrollmentError, setEnrollmentError] = useState("");
     const [filters, setFilters] = useState({
         search: "",
-        courseId: "",
+        branch: "",
+        studyYear: "",
         semester: "",
         year: "",
         status: ""
@@ -58,7 +57,8 @@ export default function EnrollmentsPage() {
                 page,
                 limit,
                 search: filters.search.trim() || undefined,
-                courseId: filters.courseId ? Number(filters.courseId) : undefined,
+                branch: filters.branch || undefined,
+                studyYear: filters.studyYear ? Number(filters.studyYear) : undefined,
                 semester: filters.semester || undefined,
                 year: filters.year ? Number(filters.year) : undefined,
                 status: filters.status
@@ -76,16 +76,13 @@ export default function EnrollmentsPage() {
         }
     }, [filters, limit, page]);
 
-    const fetchStudentsAndCourses = useCallback(async () => {
+    const fetchStudents = useCallback(async () => {
         try {
-            const [studentsRes, coursesRes] = await Promise.all([
-                loadAllPages(pageNumber => StudentService.list({ page: pageNumber, limit: LOOKUP_PAGE_SIZE })),
-                loadAllPages(pageNumber => CourseService.list({ page: pageNumber, limit: LOOKUP_PAGE_SIZE }))
-            ]);
-            setStudents(studentsRes);
-            setCourses(coursesRes);
+            setStudents(await loadAllPages(
+                pageNumber => StudentService.list({ page: pageNumber, limit: LOOKUP_PAGE_SIZE })
+            ));
         } catch (error) {
-            console.error("Failed to fetch students/courses:", error);
+            console.error("Failed to fetch students:", error);
         }
     }, []);
 
@@ -123,8 +120,8 @@ export default function EnrollmentsPage() {
     useEffect(() => {
         // Fetching data synchronizes the form options with current database records.
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        void fetchStudentsAndCourses();
-    }, [fetchStudentsAndCourses]);
+        void fetchStudents();
+    }, [fetchStudents]);
 
     async function handleDelete(id: number) {
         if (confirm("Are you sure you want to delete this enrollment?")) {
@@ -142,7 +139,7 @@ export default function EnrollmentsPage() {
     function canEditEnrollment(enrollment: EnrollmentWithDetails) {
         return user?.role === "SUPER_ADMIN" ||
             (user?.role === "FACULTY" && user.facultyId !== null &&
-                enrollment.courseFacultyId === user.facultyId);
+                (enrollment.courseFacultyId === user.facultyId || enrollment.createdByCurrentUser === true));
     }
 
     function openEnrollmentEditor(enrollment: EnrollmentWithDetails) {
@@ -198,7 +195,20 @@ export default function EnrollmentsPage() {
     async function handleExportCSV() {
         try {
             const res = await EnrollmentService.list({ page: 1, limit: 1000 });
-            exportToCSV(res.data, 'enrollments');
+            exportToCSV(res.data.map(enrollment => ({
+                studentName: enrollment.studentName || `Student #${enrollment.studentId}`,
+                studentId: enrollment.studentId,
+                branch: enrollment.branch,
+                studyYear: enrollment.studyYear === null
+                    ? "Not recorded"
+                    : getStudyYearLabel(enrollment.studyYear),
+                studentEmail: enrollment.studentEmail || "Not available",
+                semester: enrollment.semester,
+                academicYear: enrollment.year,
+                grade: enrollment.grade || "Not graded",
+                status: enrollment.status,
+                enrolledDate: enrollment.enrolledDate
+            })), "enrollments");
         } catch (error) {
             console.error("Failed to export enrollments:", error);
         }
@@ -220,7 +230,7 @@ export default function EnrollmentsPage() {
                         <h1 className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-2xl font-bold text-transparent">
                             Enrollments
                         </h1>
-                        <p className="mt-0.5 text-sm text-gray-600">Manage student course enrollments and grades</p>
+                        <p className="mt-0.5 text-sm text-gray-600">Manage student enrollments and grades</p>
                     </div>
                 </div>
             </div>
@@ -230,13 +240,12 @@ export default function EnrollmentsPage() {
                 <EnrollmentForm
                     onSubmit={handleCreateEnrollment}
                     students={students}
-                    courses={courses}
                 />
             )}
 
             <section className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm" aria-label="Enrollment filters">
                 <h2 className="mb-3 text-base font-bold text-gray-900">Search and filter enrollments</h2>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
                     <label className="text-xs font-semibold text-gray-700">
                         Search student name or ID
                         <input
@@ -248,15 +257,40 @@ export default function EnrollmentsPage() {
                         />
                     </label>
                     <label className="text-xs font-semibold text-gray-700">
-                        Course
+                        Branch
                         <select
-                            value={filters.courseId}
-                            onChange={event => updateFilters({ courseId: event.target.value })}
+                            value={filters.branch}
+                            onChange={event => {
+                                const branch = event.target.value;
+                                const selectedYear = Number(filters.studyYear);
+                                const availableYears = isEnrollmentBranch(branch)
+                                    ? ENROLLMENT_STUDY_YEARS[branch]
+                                    : [1, 2, 3, 4];
+                                updateFilters({
+                                    branch,
+                                    studyYear: filters.studyYear && !availableYears.includes(selectedYear)
+                                        ? ""
+                                        : filters.studyYear
+                                });
+                            }}
                             className="mt-1 h-10 w-full rounded-lg border border-gray-300 px-2.5 text-sm font-normal"
                         >
-                            <option value="">All courses</option>
-                            {courses.map(course => (
-                                <option key={course.id} value={course.id}>{course.code} - {course.name}</option>
+                            <option value="">All branches</option>
+                            {ENROLLMENT_BRANCHES.map(branch => <option key={branch} value={branch}>{branch}</option>)}
+                        </select>
+                    </label>
+                    <label className="text-xs font-semibold text-gray-700">
+                        Year of study
+                        <select
+                            value={filters.studyYear}
+                            onChange={event => updateFilters({ studyYear: event.target.value })}
+                            className="mt-1 h-10 w-full rounded-lg border border-gray-300 px-2.5 text-sm font-normal"
+                        >
+                            <option value="">All years</option>
+                            {(isEnrollmentBranch(filters.branch)
+                                ? ENROLLMENT_STUDY_YEARS[filters.branch]
+                                : [1, 2, 3, 4]).map(year => (
+                                <option key={year} value={year}>{getStudyYearLabel(year)}</option>
                             ))}
                         </select>
                     </label>
@@ -374,9 +408,14 @@ export default function EnrollmentsPage() {
                         </div>
                         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div><dt className="text-sm text-gray-500">Student Name</dt><dd className="font-semibold">{viewingEnrollment.studentName || "Not available"}</dd></div>
-                            <div><dt className="text-sm text-gray-500">Student ID</dt><dd className="font-semibold">#{viewingEnrollment.studentId}</dd></div>
+                            <div><dt className="text-sm text-gray-500">USN / Student ID</dt><dd className="font-semibold">#{viewingEnrollment.studentId}</dd></div>
+                            <div><dt className="text-sm text-gray-500">Branch</dt><dd className="font-semibold">{viewingEnrollment.branch}</dd></div>
+                            <div><dt className="text-sm text-gray-500">Year of Study</dt><dd className="font-semibold">
+                                {viewingEnrollment.studyYear === null
+                                    ? "Not recorded"
+                                    : getStudyYearLabel(viewingEnrollment.studyYear)}
+                            </dd></div>
                             <div><dt className="text-sm text-gray-500">Email</dt><dd className="font-semibold">{viewingEnrollment.studentEmail || "Not available"}</dd></div>
-                            <div><dt className="text-sm text-gray-500">Course</dt><dd className="font-semibold">{viewingEnrollment.courseCode} - {viewingEnrollment.courseName}</dd></div>
                             <div><dt className="text-sm text-gray-500">Semester</dt><dd className="font-semibold">{viewingEnrollment.semester}</dd></div>
                             <div><dt className="text-sm text-gray-500">Academic Year</dt><dd className="font-semibold">{viewingEnrollment.year}</dd></div>
                             <div><dt className="text-sm text-gray-500">Grade</dt><dd className="font-semibold">{viewingEnrollment.grade || "Not graded"}</dd></div>
@@ -407,7 +446,6 @@ export default function EnrollmentsPage() {
                                 initialData={editingEnrollment}
                                 onSubmit={handleAdminEnrollmentUpdate}
                                 students={students}
-                                courses={courses}
                             />
                         ) : (
                             <form onSubmit={event => void handleFacultyEnrollmentUpdate(event)} className="grid grid-cols-1 gap-4 sm:grid-cols-2">

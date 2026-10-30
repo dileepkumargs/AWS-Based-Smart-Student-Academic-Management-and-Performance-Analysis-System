@@ -13,9 +13,7 @@ export default function Header() {
         ? [
             { name: "Overview", href: "/super-admin/dashboard" },
             { name: "Users", href: "/super-admin/users" },
-            { name: "Students", href: "/students" },
             { name: "Courses", href: "/courses" },
-            { name: "Faculty", href: "/faculty" },
             { name: "Enrollments", href: "/enrollments" },
             { name: "Attendance Management", href: "/attendance" },
             { name: "Announcements", href: "/announcements" },

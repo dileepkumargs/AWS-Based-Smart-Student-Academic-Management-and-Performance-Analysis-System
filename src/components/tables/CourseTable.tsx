@@ -12,24 +12,26 @@ export default function CourseTable({ courses }: Props) {
             <table className="w-full">
                 <thead>
                     <tr className="bg-slate-50/50 border-b border-slate-100">
-                        <th className="px-6 py-4 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Code</th>
-                        <th className="px-6 py-4 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Name</th>
+                        <th className="px-6 py-4 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Course ID</th>
+                        <th className="px-6 py-4 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Course Code</th>
+                        <th className="px-6 py-4 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Course Name</th>
+                        <th className="px-6 py-4 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Branch</th>
                         <th className="px-6 py-4 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Credits</th>
-                        <th className="px-6 py-4 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Department</th>
-                        <th className="px-6 py-4 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Instructor</th>
+                        <th className="px-6 py-4 text-left text-xs font-black text-slate-400 uppercase tracking-widest">Assigned Faculty</th>
                         <th className="px-6 py-4 text-right text-xs font-black text-slate-400 uppercase tracking-widest">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {courses.length === 0 ? (
                         <tr>
-                            <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-medium italic">
+                            <td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-medium italic">
                                 No courses found in the catalog...
                             </td>
                         </tr>
                     ) : (
                         courses.map((c) => (
                             <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
+                                <td className="px-6 py-4 text-sm font-medium text-slate-500">{c.id}</td>
                                 <td className="px-6 py-4">
                                     <Link
                                         href={`/courses/${c.id}`}
@@ -43,13 +45,13 @@ export default function CourseTable({ courses }: Props) {
                                     <span className="text-sm font-bold text-slate-700">{c.name}</span>
                                 </td>
                                 <td className="px-6 py-4">
+                                    <span className="text-sm font-medium text-slate-500">{c.branch || "Unassigned"}</span>
+                                </td>
+                                <td className="px-6 py-4">
                                     <span className="text-sm font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md">{c.credits} CR</span>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className="text-sm font-medium text-slate-500">{c.department}</span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className="text-sm font-medium text-slate-500 italic">{c.instructor || "TBA"}</span>
+                                    <span className="text-sm font-medium text-slate-500 italic">{c.instructor || "Unassigned"}</span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <Link

@@ -1,39 +1,38 @@
 import { useState, useEffect } from "react";
-import { Filter, X, GraduationCap, BookOpen } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { X, GraduationCap } from "lucide-react";
+import { ENROLLMENT_BRANCHES } from "@/lib/enrollment-options";
 
 interface Props {
-    onFilterChange: (filters: { department?: string; credits?: number }) => void;
-    departments: string[];
+    onFilterChange: (filters: { branch?: string; credits?: number }) => void;
 }
 
-export default function CourseFilters({ onFilterChange, departments }: Props) {
-    const [department, setDepartment] = useState<string>("");
+export default function CourseFilters({ onFilterChange }: Props) {
+    const [branch, setBranch] = useState<string>("");
     const [credits, setCredits] = useState<string>("");
 
     useEffect(() => {
         onFilterChange({
-            department: department || undefined,
+            branch: branch || undefined,
             credits: credits ? Number(credits) : undefined
         });
-    }, [department, credits]);
+    }, [branch, credits, onFilterChange]);
 
     return (
         <div className="space-y-6">
             <div className="space-y-4">
                 <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                        <BookOpen className="w-3 h-3" />
-                        Department
+                        <GraduationCap className="w-3 h-3" />
+                        Branch
                     </label>
                     <select
-                        value={department}
-                        onChange={(e) => setDepartment(e.target.value)}
+                        value={branch}
+                        onChange={(e) => setBranch(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 outline-none transition-all"
                     >
-                        <option value="">All Departments</option>
-                        {departments.map(dept => (
-                            <option key={dept} value={dept}>{dept}</option>
+                        <option value="">All Branches</option>
+                        {ENROLLMENT_BRANCHES.map(option => (
+                            <option key={option} value={option}>{option}</option>
                         ))}
                     </select>
                 </div>
@@ -56,10 +55,10 @@ export default function CourseFilters({ onFilterChange, departments }: Props) {
                 </div>
             </div>
 
-            {(department || credits) && (
+            {(branch || credits) && (
                 <button
                     onClick={() => {
-                        setDepartment("");
+                        setBranch("");
                         setCredits("");
                     }}
                     className="w-full flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 bg-rose-50 py-3 rounded-xl transition-colors border border-rose-100"

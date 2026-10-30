@@ -1,7 +1,9 @@
 export interface Enrollment {
     id: number;
     studentId: number;
-    courseId: number;
+    courseId: number | null;
+    branch: string;
+    studyYear: number | null;
     grade?: string; // A, B, C, D, F or pending
     semester: string;
     year: number;
@@ -16,6 +18,8 @@ export interface EnrollmentWithDetails extends Enrollment {
     studentYear?: number;
     courseName?: string;
     courseCode?: string;
+    courseBranch?: string | null;
     courseDepartment?: string;
     courseFacultyId?: number | null;
+    createdByCurrentUser?: boolean;
 }

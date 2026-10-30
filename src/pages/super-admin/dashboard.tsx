@@ -1,33 +1,23 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Users, BookOpen, GraduationCap, ShieldCheck } from "lucide-react";
-import { StudentService } from "@/services/student.service";
+import { Users, BookOpen, ShieldCheck } from "lucide-react";
 import { CourseService } from "@/services/course.service";
-import { FacultyService } from "@/services/faculty.service";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 
 interface Summary {
-    students: number;
     courses: number;
-    faculty: number;
     loading: boolean;
 }
 
 export default function SuperAdminDashboardPage() {
-    const [summary, setSummary] = useState<Summary>({ students: 0, courses: 0, faculty: 0, loading: true });
+    const [summary, setSummary] = useState<Summary>({ courses: 0, loading: true });
 
     useEffect(() => {
         let active = true;
-        Promise.all([
-            StudentService.list({ page: 1, limit: 1 }),
-            CourseService.list({ page: 1, limit: 1 }),
-            FacultyService.list({ page: 1, limit: 1 })
-        ]).then(([students, courses, faculty]) => {
+        CourseService.list({ page: 1, limit: 1 }).then(courses => {
             if (active) setSummary({
-                students: students.meta.total,
                 courses: courses.meta.total,
-                faculty: faculty.meta.total,
                 loading: false
             });
         }).catch(error => {
@@ -45,9 +35,7 @@ export default function SuperAdminDashboardPage() {
                 <p className="mt-2 text-slate-600">Manage institution records and role accounts. Counts reflect records currently stored in the academic database.</p>
             </header>
             <section className="grid gap-5 md:grid-cols-3" aria-label="Institution summary">
-                <StatCard title="Students" value={summary.loading ? "..." : summary.students} description="Academic profiles" icon={Users} iconClassName="bg-blue-50 text-blue-700" />
                 <StatCard title="Courses" value={summary.loading ? "..." : summary.courses} description="Course catalog" icon={BookOpen} iconClassName="bg-amber-50 text-amber-700" />
-                <StatCard title="Faculty" value={summary.loading ? "..." : summary.faculty} description="Faculty profiles" icon={GraduationCap} iconClassName="bg-violet-50 text-violet-700" />
             </section>
             <Card>
                 <CardHeader><CardTitle>Administration</CardTitle></CardHeader>
@@ -60,7 +48,6 @@ export default function SuperAdminDashboardPage() {
                         <span className="rounded-xl bg-blue-100 p-3 text-blue-800"><Users aria-hidden="true" /></span>
                         <span><span className="block font-bold text-slate-900">Audit API</span><span className="text-sm text-slate-500">Administrative changes are recorded</span></span>
                     </Link>
-                    <Link href="/students" className="rounded-2xl border border-slate-200 p-5 font-bold text-slate-800 hover:border-emerald-400">Student records</Link>
                     <Link href="/courses" className="rounded-2xl border border-slate-200 p-5 font-bold text-slate-800 hover:border-emerald-400">Course catalog</Link>
                 </CardContent>
             </Card>

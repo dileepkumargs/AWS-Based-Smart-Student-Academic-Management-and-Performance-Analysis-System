@@ -183,7 +183,7 @@ export default function AttendancePage() {
                     <label className="text-xs font-semibold text-slate-700">Course
                         <select value={courseId} onChange={event => setCourseId(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm">
                             <option value="">Select course</option>
-                            {availableCourses.map(course => <option key={course.id} value={course.id}>{course.code} — {course.name}</option>)}
+                            {availableCourses.map(course => <option key={course.id} value={course.id}>{course.code} — {course.name}{course.branch ? ` (${course.branch})` : " (Branch unassigned)"}</option>)}
                         </select>
                     </label>
                     <label className="text-xs font-semibold text-slate-700">Semester

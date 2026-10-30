@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(user.role === "STUDENT" ? 404 : 403).json({ message: "Course not found." });
         }
         const { rows } = await getPool().query(
-            `SELECT c.id, c.code, c.name, c.credits, c.department,
+            `SELECT c.id, c.code, c.name, c.credits, c.department, c.branch,
                     COALESCE(f.name, c.instructor) AS instructor
              FROM courses c LEFT JOIN faculty f ON f.id = c.faculty_id WHERE c.id = $1`,
             [id]
@@ -55,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 actorRole: user.role
             });
             const { rows } = await getPool().query(
-                `SELECT c.id, c.code, c.name, c.credits, c.department,
+                `SELECT c.id, c.code, c.name, c.credits, c.department, c.branch,
                         COALESCE(f.name, c.instructor) AS instructor, c.faculty_id AS facultyId
                  FROM courses c LEFT JOIN faculty f ON f.id = c.faculty_id WHERE c.id = $1`,
                 [id]
@@ -76,7 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(400).json({ message: "Provide at least one valid course field." });
         }
         const current = await getPool().query(
-            "SELECT id, code, name, credits, department, instructor FROM courses WHERE id = $1",
+            "SELECT id, code, name, credits, department, branch, instructor FROM courses WHERE id = $1",
             [id]
         );
         if (!current.rows[0]) return res.status(404).json({ message: "Course not found." });
@@ -85,18 +85,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ? await getPool().query("SELECT id FROM faculty WHERE name = $1 ORDER BY id LIMIT 1", [updated.instructor])
             : { rows: [] };
         await getPool().query(
-            `UPDATE courses SET code = $1, name = $2, credits = $3, department = $4,
+            `UPDATE courses SET code = $1, name = $2, credits = $3, branch = $4,
                     instructor = $5, faculty_id = $6
              WHERE id = $7`,
-            [updated.code, updated.name, updated.credits, updated.department, updated.instructor ?? null,
-                facultyResult.rows[0]?.id ?? null, id]
+            [updated.code, updated.name, updated.credits, updated.branch,
+                updated.instructor ?? null, facultyResult.rows[0]?.id ?? null, id]
         );
         await writeAuditLog(user.id, "course.updated", "course", id, {
             fields: Object.keys(parsed.data),
             actorRole: user.role
         });
         const { rows } = await getPool().query(
-            `SELECT c.id, c.code, c.name, c.credits, c.department,
+            `SELECT c.id, c.code, c.name, c.credits, c.department, c.branch,
                     COALESCE(f.name, c.instructor) AS instructor, c.faculty_id AS facultyId
              FROM courses c LEFT JOIN faculty f ON f.id = c.faculty_id WHERE c.id = $1`,
             [id]

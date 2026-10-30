@@ -101,6 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 getPool().query(
                     `SELECT e.id AS enrollmentId, e.student_id AS studentId, s.name AS studentName,
                             u.email AS studentEmail, c.id AS courseId, c.code AS courseCode, c.name AS courseName,
+                            c.branch AS courseBranch,
                             e.semester, e.year, a.status, DATE_FORMAT(a.attendance_date, '%Y-%m-%d') AS attendanceDate
                      ${from} WHERE ${where}
                      ORDER BY s.name LIMIT $${rosterValues.length + 1} OFFSET $${rosterValues.length + 2}`,
@@ -159,6 +160,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             getPool().query(
                 `SELECT a.id, e.id AS enrollmentId, e.student_id AS studentId, s.name AS studentName,
                         u.email AS studentEmail, c.id AS courseId, c.code AS courseCode, c.name AS courseName,
+                        c.branch AS courseBranch,
                         e.semester, e.year, a.status, DATE_FORMAT(a.attendance_date, '%Y-%m-%d') AS attendanceDate,
                         attendance_stats.attendanceCount, attendance_stats.attendedCount
                  ${from} WHERE ${where}

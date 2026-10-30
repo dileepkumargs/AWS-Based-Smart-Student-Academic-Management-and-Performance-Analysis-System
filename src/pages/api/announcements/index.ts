@@ -6,6 +6,7 @@ import { requireUser, writeAuditLog } from "@/lib/auth";
 
 const announcementSelect = `
     SELECT a.id, a.course_id AS courseId, c.code AS courseCode, c.name AS courseName,
+           c.branch AS courseBranch,
            a.title, a.description, a.category,
            DATE_FORMAT(a.publication_date, '%Y-%m-%d') AS publicationDate,
            DATE_FORMAT(a.expiry_date, '%Y-%m-%d') AS expiryDate,

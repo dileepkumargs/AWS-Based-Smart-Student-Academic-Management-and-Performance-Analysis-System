@@ -53,7 +53,7 @@ export default function FacultyCourseDirectory() {
 
     function openEditor(course: Course) {
         setEditingCourse(course);
-        form.reset({ name: course.name, department: course.department });
+        form.reset({ name: course.name, department: course.department ?? "" });
     }
 
     async function saveCourse(data: FacultyCourseUpdateData) {
@@ -155,6 +155,7 @@ export default function FacultyCourseDirectory() {
                                 <th className="px-5 py-3">Code</th>
                                 <th className="px-5 py-3">Course name</th>
                                 <th className="px-5 py-3">Department</th>
+                                <th className="px-5 py-3">Branch</th>
                                 <th className="px-5 py-3">Credits</th>
                                 <th className="px-5 py-3">Assigned faculty</th>
                                 <th className="px-5 py-3"><span className="sr-only">Actions</span></th>
@@ -171,6 +172,7 @@ export default function FacultyCourseDirectory() {
                                         <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-700">{course.code}</td>
                                         <td className="px-5 py-4 font-semibold text-slate-900">{course.name}</td>
                                         <td className="px-5 py-4 text-slate-600">{course.department}</td>
+                                        <td className="px-5 py-4 text-slate-600">{course.branch || "Unassigned"}</td>
                                         <td className="px-5 py-4 text-slate-600">{course.credits}</td>
                                         <td className="px-5 py-4 text-slate-600">{course.instructor || "Unassigned"}</td>
                                         <td className="whitespace-nowrap px-5 py-4 text-right">

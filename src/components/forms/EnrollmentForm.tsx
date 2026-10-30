@@ -1,32 +1,54 @@
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { enrollmentSchema, EnrollmentFormData } from "@/lib/validators";
+import { enrollmentFormSchema, EnrollmentFormData, EnrollmentFormInput } from "@/lib/validators";
 import { Student } from "@/types/student";
-import { Course } from "@/types/course";
+import { ENROLLMENT_BRANCHES, ENROLLMENT_STUDY_YEARS, getStudyYearLabel, isEnrollmentBranch } from "@/lib/enrollment-options";
 
 interface Props {
     onSubmit: (data: EnrollmentFormData) => Promise<boolean>;
     students: Student[];
-    courses: Course[];
-    initialData?: Partial<EnrollmentFormData>;
+    initialData?: Omit<Partial<EnrollmentFormInput>, "studyYear"> & { studyYear?: number | null };
 }
 
 const fieldClassName = "h-10 w-full rounded-lg border border-purple-300 bg-white px-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200";
 const labelClassName = "mb-1 block text-xs font-semibold text-gray-700";
 
-export default function EnrollmentForm({ onSubmit, students, courses, initialData }: Props) {
+export default function EnrollmentForm({
+    onSubmit,
+    students,
+    initialData
+}: Props) {
     const {
         register,
         handleSubmit,
+        control,
+        setValue,
+        clearErrors,
         formState: { errors, isSubmitting },
         reset
-    } = useForm<EnrollmentFormData>({
-        resolver: zodResolver(enrollmentSchema),
-        defaultValues: initialData || {
+    } = useForm<EnrollmentFormInput, undefined, EnrollmentFormData>({
+        resolver: zodResolver(enrollmentFormSchema),
+        defaultValues: initialData
+            ? { ...initialData, studyYear: initialData.studyYear ?? undefined }
+            : {
+            branch: "",
+            studyYear: 0,
             enrolledDate: new Date().toISOString().split('T')[0],
             status: 'enrolled',
             semester: 'Spring',
             year: new Date().getFullYear()
+        }
+    });
+    const selectedBranch = useWatch({ control, name: "branch" });
+    const branchForOptions = selectedBranch ?? "";
+    const availableStudyYears = isEnrollmentBranch(branchForOptions)
+        ? ENROLLMENT_STUDY_YEARS[branchForOptions]
+        : [];
+    const studentRegistration = register("studentId", { valueAsNumber: true });
+    const branchRegistration = register("branch", {
+        onChange: () => {
+            setValue("studyYear", 0, { shouldValidate: false });
+            clearErrors("studyYear");
         }
     });
 
@@ -34,6 +56,8 @@ export default function EnrollmentForm({ onSubmit, students, courses, initialDat
         const saved = await onSubmit(data);
         if (saved && !initialData) {
             reset({
+                branch: "",
+                studyYear: 0,
                 enrolledDate: new Date().toISOString().slice(0, 10),
                 status: "enrolled",
                 semester: "Spring",
@@ -61,7 +85,15 @@ export default function EnrollmentForm({ onSubmit, students, courses, initialDat
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                     <label className={labelClassName} htmlFor="enrollment-student">Student</label>
-                    <select id="enrollment-student" {...register("studentId", { valueAsNumber: true })} className={fieldClassName}>
+                    <select
+                        id="enrollment-student"
+                        {...studentRegistration}
+                        onChange={event => {
+                            void studentRegistration.onChange(event);
+                            clearErrors("branch");
+                        }}
+                        className={fieldClassName}
+                    >
                         <option value="">Select a student</option>
                         {students.map(student => (
                             <option key={student.id} value={student.id}>{student.name}</option>
@@ -71,14 +103,34 @@ export default function EnrollmentForm({ onSubmit, students, courses, initialDat
                 </div>
 
                 <div>
-                    <label className={labelClassName} htmlFor="enrollment-course">Course</label>
-                    <select id="enrollment-course" {...register("courseId", { valueAsNumber: true })} className={fieldClassName}>
-                        <option value="">Select a course</option>
-                        {courses.map(course => (
-                            <option key={course.id} value={course.id}>{course.code} - {course.name}</option>
+                    <label className={labelClassName} htmlFor="enrollment-branch">Branch</label>
+                    <select
+                        id="enrollment-branch"
+                        {...branchRegistration}
+                        className={fieldClassName}
+                    >
+                        <option value="">Select Branch</option>
+                        {ENROLLMENT_BRANCHES.map(branch => (
+                            <option key={branch} value={branch}>{branch}</option>
                         ))}
                     </select>
-                    {errors.courseId && <p className="mt-1 text-xs text-red-600">{errors.courseId.message}</p>}
+                    {errors.branch && <p className="mt-1 text-xs text-red-600">{errors.branch.message}</p>}
+                </div>
+
+                <div>
+                    <label className={labelClassName} htmlFor="enrollment-study-year">Year of Study</label>
+                    <select
+                        id="enrollment-study-year"
+                        {...register("studyYear", { valueAsNumber: true })}
+                        disabled={!selectedBranch}
+                        className={fieldClassName}
+                    >
+                        <option value={0} hidden>{selectedBranch ? "Select Year of Study" : "Select Branch first"}</option>
+                        {availableStudyYears.map(year => (
+                            <option key={year} value={year}>{getStudyYearLabel(year)}</option>
+                        ))}
+                    </select>
+                    {errors.studyYear && <p className="mt-1 text-xs text-red-600">{errors.studyYear.message}</p>}
                 </div>
 
                 <div>

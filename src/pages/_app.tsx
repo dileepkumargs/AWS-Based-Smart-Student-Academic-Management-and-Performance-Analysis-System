@@ -48,6 +48,11 @@ export default function App({ Component, pageProps }: AppProps) {
           void router.replace("/change-password");
           return;
         }
+        if (authenticatedUser.role === "SUPER_ADMIN" &&
+            ["/students", "/students/[id]", "/faculty", "/faculty/[id]"].includes(router.pathname)) {
+          void router.replace("/super-admin/dashboard");
+          return;
+        }
         if (authenticatedUser.role === "STUDENT" &&
             !["/student/dashboard", "/change-password"].includes(router.pathname)) {
           void router.replace("/student/dashboard");

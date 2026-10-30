@@ -12,6 +12,7 @@ export interface AttendanceRecord {
     courseId: number;
     courseCode: string;
     courseName: string;
+    courseBranch?: string | null;
     semester: string;
     year: number;
     status: AttendanceStatus | null;
@@ -34,6 +35,7 @@ export interface Announcement {
     courseId: number;
     courseCode: string;
     courseName: string;
+    courseBranch?: string | null;
     title: string;
     description: string;
     category: AnnouncementCategory;
@@ -49,6 +51,7 @@ export interface TimetableEntry {
     courseId: number;
     courseCode: string;
     courseName: string;
+    courseBranch?: string | null;
     facultyId: number;
     facultyName: string;
     semester: string;

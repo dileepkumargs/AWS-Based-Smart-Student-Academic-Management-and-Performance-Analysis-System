@@ -116,7 +116,7 @@ export default function CourseDetailPage({ course, error }: Props) {
     return (
         <DetailLayout
             title={course.name}
-            subtitle={`${course.code} — Department of ${course.department}`}
+            subtitle={`${course.code} — ${course.branch || "Branch unassigned"}`}
             badge="Course Catalog"
             icon={BookOpen}
             backHref="/courses"
@@ -172,7 +172,7 @@ export default function CourseDetailPage({ course, error }: Props) {
                             <CardContent>
                                 <CourseForm
                                     onSubmit={handleUpdate}
-                                    defaultValues={course}
+                                    defaultValues={{ ...course, branch: course.branch ?? undefined }}
                                 />
                                 <button
                                     onClick={() => setIsEditing(false)}
@@ -293,6 +293,10 @@ export default function CourseDetailPage({ course, error }: Props) {
                                     <p className="font-black text-slate-900 text-xl tracking-tight">{course.code}</p>
                                 </div>
                                 <div className="space-y-1">
+                                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Branch</p>
+                                    <p className="font-black text-slate-900 text-xl tracking-tight">{course.branch || "Unassigned"}</p>
+                                </div>
+                                <div className="space-y-1">
                                     <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Credit Unit Value</p>
                                     <p className="font-bold text-slate-900 text-xl tracking-tight">{course.credits} Credits</p>
                                 </div>
@@ -318,10 +322,10 @@ export default function CourseDetailPage({ course, error }: Props) {
                             <div className="bg-slate-900 p-6 rounded-3xl text-white space-y-4">
                                 <div className="flex items-center gap-3">
                                     <Briefcase className="w-5 h-5 text-emerald-400" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest opacity-60 text-emerald-400">Department Status</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest opacity-60 text-emerald-400">Branch Status</span>
                                 </div>
                                 <p className="text-xs font-medium leading-relaxed opacity-80">
-                                    This course is a primary constituent of the **{course.department}** curriculum for the current academic year.
+                                    This course is assigned to the {course.branch || "unassigned"} branch.
                                 </p>
                             </div>
                         </CardContent>
@@ -355,7 +359,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
         return { notFound: true };
     }
     const { rows } = await getPool().query(
-        `SELECT c.id, c.code, c.name, c.credits, c.department,
+        `SELECT c.id, c.code, c.name, c.credits, c.branch,
                 COALESCE(f.name, c.instructor) AS instructor
          FROM courses c LEFT JOIN faculty f ON f.id = c.faculty_id WHERE c.id = $1`,
         [courseId]
@@ -376,7 +380,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
                 name: rows[0].name,
                 id: Number(rows[0].id),
                 credits: Number(rows[0].credits),
-                department: rows[0].department,
+                branch: rows[0].branch ?? null,
                 instructor: rows[0].instructor ?? undefined
             }
         }

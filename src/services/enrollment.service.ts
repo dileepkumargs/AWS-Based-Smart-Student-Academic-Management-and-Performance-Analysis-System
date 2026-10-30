@@ -29,6 +29,8 @@ export interface EnrollmentListParams {
     studentId?: number;
     courseId?: number;
     search?: string;
+    branch?: string;
+    studyYear?: number;
     semester?: string;
     year?: number;
     status?: Enrollment["status"];

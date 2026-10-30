@@ -124,11 +124,22 @@ try {
       for (const enrollment of seed.data.enrollments ?? []) {
         const [existing] = await connection.execute("SELECT id FROM enrollments WHERE id = ?", [enrollment.id]);
         if (existing.length === 0) {
+          const [studentRows] = await connection.execute(
+            "SELECT course FROM students WHERE id = ?",
+            [enrollment.studentId]
+          );
+          if (studentRows.length === 0) {
+            throw new Error(`Cannot seed enrollment ${enrollment.id}: student ${enrollment.studentId} does not exist.`);
+          }
+          const branch = typeof studentRows[0].course === "string" ? studentRows[0].course.trim() : "";
+          if (!branch) {
+            throw new Error(`Cannot seed enrollment ${enrollment.id}: student ${enrollment.studentId} has no branch.`);
+          }
           await connection.execute(
-            `INSERT INTO enrollments (id, student_id, course_id, grade, semester, year, status, enrolled_date)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [enrollment.id, enrollment.studentId, enrollment.courseId, enrollment.grade ?? null,
-              enrollment.semester, enrollment.year, enrollment.status, enrollment.enrolledDate]
+            `INSERT INTO enrollments (id, student_id, course_id, branch, study_year, grade, semester, year, status, enrolled_date)
+             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
+            [enrollment.id, enrollment.studentId, enrollment.courseId, branch,
+              enrollment.grade ?? null, enrollment.semester, enrollment.year, enrollment.status, enrollment.enrolledDate]
           );
         }
       }

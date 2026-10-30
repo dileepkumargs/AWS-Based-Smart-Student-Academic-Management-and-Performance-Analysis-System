@@ -1,4 +1,5 @@
 import { EnrollmentWithDetails } from "@/types/enrollment";
+import { getStudyYearLabel } from "@/lib/enrollment-options";
 
 interface Props {
     enrollments: EnrollmentWithDetails[];
@@ -47,14 +48,14 @@ export default function EnrollmentTable({ enrollments, onView, onEdit, canEdit, 
     return (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
             <div className="overscroll-x-contain overflow-x-auto">
-                <table className="w-full min-w-[1240px] border-collapse text-xs">
+                <table className="w-full min-w-[1120px] border-collapse text-xs">
                     <thead className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
                         <tr>
                             <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Student Name</th>
-                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Student ID</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">USN / Student ID</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Branch</th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Year of Study</th>
                             <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Email</th>
-                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Course Code</th>
-                            <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Course Name</th>
                             <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Semester</th>
                             <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Academic Year</th>
                             <th className="whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide">Grade</th>
@@ -75,17 +76,15 @@ export default function EnrollmentTable({ enrollments, onView, onEdit, canEdit, 
                                     </span>
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-2.5 font-medium text-gray-900">#{enrollment.studentId}</td>
+                                <td className="whitespace-nowrap px-3 py-2.5 font-medium text-gray-900">{enrollment.branch}</td>
+                                <td className="whitespace-nowrap px-3 py-2.5 font-medium text-gray-900">
+                                    {enrollment.studyYear === null
+                                        ? "Not recorded"
+                                        : getStudyYearLabel(enrollment.studyYear)}
+                                </td>
                                 <td className="px-3 py-2.5 text-gray-700">
                                     <span className="block max-w-44 truncate" title={enrollment.studentEmail || undefined}>
                                         {enrollment.studentEmail || "Not available"}
-                                    </span>
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-2.5 font-semibold text-gray-900">
-                                    {enrollment.courseCode || `Course #${enrollment.courseId}`}
-                                </td>
-                                <td className="px-3 py-2.5 text-gray-700">
-                                    <span className="block max-w-40 truncate" title={enrollment.courseName || undefined}>
-                                        {enrollment.courseName || "Not available"}
                                     </span>
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-2.5 font-medium text-gray-900">{enrollment.semester}</td>

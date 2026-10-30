@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import CourseTable from "@/components/tables/CourseTable";
 import CourseForm from "@/components/forms/CourseForm";
@@ -7,8 +7,8 @@ import { Course } from "@/types/course";
 import { CourseService } from "@/services/course.service";
 import { CourseFormData } from "@/lib/validators";
 import { exportCoursesToCSV } from "@/lib/csv-utils";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
-import { Search, FileDown, Plus, BookOpen } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Search, FileDown, BookOpen } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export default function CoursesPage() {
@@ -17,18 +17,13 @@ export default function CoursesPage() {
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [search, setSearch] = useState("");
-    const [filters, setFilters] = useState<{ department?: string; credits?: number }>({});
+    const [filters, setFilters] = useState<{ branch?: string; credits?: number }>({});
     const [loading, setLoading] = useState(false);
     const [allCourses, setAllCourses] = useState<Course[]>([]);
 
     const limit = 5;
 
-    useEffect(() => {
-        fetchCourses();
-        fetchAllCourses();
-    }, [page, search, filters]);
-
-    async function fetchCourses() {
+    const fetchCourses = useCallback(async () => {
         setLoading(true);
         try {
             const res = await CourseService.list({
@@ -44,9 +39,9 @@ export default function CoursesPage() {
         } finally {
             setLoading(false);
         }
-    }
+    }, [filters, limit, page, search]);
 
-    async function fetchAllCourses() {
+    const fetchAllCourses = useCallback(async () => {
         try {
             const res = await CourseService.list({
                 page: 1,
@@ -57,7 +52,14 @@ export default function CoursesPage() {
         } catch (error) {
             console.error("Failed to fetch all courses:", error);
         }
-    }
+    }, [search]);
+
+    useEffect(() => {
+        // Fetching data synchronizes this catalog with persisted course records.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void fetchCourses();
+        void fetchAllCourses();
+    }, [fetchAllCourses, fetchCourses]);
 
     async function handleCreateCourse(data: CourseFormData) {
         try {
@@ -78,15 +80,10 @@ export default function CoursesPage() {
 
     const totalPages = Math.ceil(total / limit);
 
-    const departments = useMemo(() => {
-        return Array.from(new Set(allCourses.map(c => c.department))).sort();
-    }, [allCourses]);
-
-    async function handleFilterChange(newFilters: { department?: string; credits?: number }) {
+    const handleFilterChange = useCallback((newFilters: { branch?: string; credits?: number }) => {
         setFilters(newFilters);
         setPage(1);
-    }
-
+    }, []);
     return (
         <div className="p-8 max-w-[1600px] mx-auto space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -119,7 +116,6 @@ export default function CoursesPage() {
                         <CardContent>
                             <CourseFilters
                                 onFilterChange={handleFilterChange}
-                                departments={departments}
                             />
                         </CardContent>
                     </Card>

@@ -316,7 +316,7 @@ export default function SuperAdminUsersPage() {
                                     <label className="text-sm font-bold text-slate-700">Program / course
                                         <select required value={form.courseId} disabled={coursesLoading || courses.length === 0} onChange={event => setForm(value => ({ ...value, courseId: event.target.value }))} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 disabled:bg-slate-100">
                                             <option value="">{coursesLoading ? "Loading courses…" : "Select a course"}</option>
-                                            {courses.map(course => <option key={course.id} value={course.id}>{course.code} — {course.name}</option>)}
+                                            {courses.map(course => <option key={course.id} value={course.id}>{course.code} — {course.name}{course.branch ? ` (${course.branch})` : " (Branch unassigned)"}</option>)}
                                         </select>
                                         {coursesError && <span role="alert" className="mt-1 block text-xs font-medium text-rose-700">{coursesError}</span>}
                                         {!coursesLoading && !coursesError && courses.length === 0 && <span className="mt-1 block text-xs font-medium text-slate-500">No courses are available in the catalog.</span>}

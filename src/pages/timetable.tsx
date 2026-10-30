@@ -150,7 +150,7 @@ export default function TimetablePage() {
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <label className="text-xs font-semibold text-slate-600">Course
                             <select required value={form.courseId || ""} onChange={event => setForm(current => ({ ...current, courseId: Number(event.target.value) }))} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm">
-                                <option value="">Select course</option>{availableCourses.map(course => <option key={course.id} value={course.id}>{course.code} — {course.name}</option>)}
+                                <option value="">Select course</option>{availableCourses.map(course => <option key={course.id} value={course.id}>{course.code} — {course.name}{course.branch ? ` (${course.branch})` : " (Branch unassigned)"}</option>)}
                             </select>
                         </label>
                         <label className="text-xs font-semibold text-slate-600">Schedule type

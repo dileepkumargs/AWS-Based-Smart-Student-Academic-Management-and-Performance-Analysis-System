@@ -1,0 +1,2 @@
+ALTER TABLE courses
+    MODIFY COLUMN department VARCHAR(120) NULL;

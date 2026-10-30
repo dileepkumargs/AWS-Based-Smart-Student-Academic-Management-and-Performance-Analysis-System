@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const [result, count] = await Promise.all([
             getPool().query(
                 `SELECT s.id, s.name, s.year, s.course, s.gpa, s.course_id AS courseId,
-                        c.code AS courseCode, c.name AS courseName
+                        c.code AS courseCode, c.name AS courseName, c.branch AS courseBranch
                  FROM students s
                  LEFT JOIN courses c ON c.id = s.course_id
                  WHERE s.user_id IS NULL

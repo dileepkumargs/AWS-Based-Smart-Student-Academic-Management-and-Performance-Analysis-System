@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { courseSchema, CourseFormData } from "@/lib/validators";
+import { ENROLLMENT_BRANCHES } from "@/lib/enrollment-options";
 
 interface Props {
     onSubmit: (data: CourseFormData) => Promise<void>;
@@ -81,18 +82,23 @@ export default function CourseForm({ onSubmit, defaultValues }: Props) {
                     )}
                 </div>
 
-                {/* Department */}
+                {/* Branch */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Department
+                        Branch
                     </label>
-                    <input
-                        {...register("department")}
-                        placeholder="e.g., Computer Science"
+                    <select
+                        {...register("branch")}
                         className="border border-gray-300 rounded-lg p-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    {errors.department && (
-                        <p className="text-red-500 text-sm mt-1">{errors.department.message}</p>
+                        defaultValue={defaultValues?.branch ?? ""}
+                    >
+                        <option value="">Select Branch</option>
+                        {ENROLLMENT_BRANCHES.map(branch => (
+                            <option key={branch} value={branch}>{branch}</option>
+                        ))}
+                    </select>
+                    {errors.branch && (
+                        <p className="text-red-500 text-sm mt-1">{errors.branch.message}</p>
                     )}
                 </div>
 

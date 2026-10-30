@@ -15,13 +15,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(user.role === "STUDENT" ? 404 : 403).json({ message: "Enrollment not found." });
         }
         const { rows } = await getPool().query(
-            `SELECT e.id, e.student_id AS studentId, e.course_id AS courseId, e.grade,
-                    e.semester, e.year, e.status, DATE_FORMAT(e.enrolled_date, '%Y-%m-%d') AS enrolledDate,
+            `SELECT e.id, e.student_id AS studentId, e.course_id AS courseId, e.branch,
+                    e.study_year AS studyYear, e.grade, e.semester, e.year, e.status,
+                    DATE_FORMAT(e.enrolled_date, '%Y-%m-%d') AS enrolledDate,
                     s.name AS studentName, u.email AS studentEmail, c.name AS courseName, c.code AS courseCode,
-                    c.department AS courseDepartment, c.faculty_id AS courseFacultyId
+                    c.department AS courseDepartment, c.branch AS courseBranch,
+                    c.faculty_id AS courseFacultyId
              FROM enrollments e
              JOIN students s ON s.id = e.student_id
-             JOIN courses c ON c.id = e.course_id
+             LEFT JOIN courses c ON c.id = e.course_id
              LEFT JOIN users u ON u.id = s.user_id
              WHERE e.id = $1`,
             [id]
@@ -32,8 +34,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ...row,
             id: Number(row.id),
             studentId: Number(row.studentId),
-            courseId: Number(row.courseId),
+            courseId: row.courseId === null ? null : Number(row.courseId),
             year: Number(row.year),
+            studyYear: row.studyYear === null ? null : Number(row.studyYear),
             courseFacultyId: row.courseFacultyId === null ? null : Number(row.courseFacultyId)
         });
     }
@@ -52,6 +55,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const updateData: {
             studentId?: number;
             courseId?: number;
+            branch?: string;
+            studyYear?: number;
             grade?: string | null;
             semester?: string;
             year?: number;
@@ -64,8 +69,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(403).json({ message: "Faculty may only update grades and completion status." });
         }
         const current = await getPool().query(
-            `SELECT id, student_id AS studentId, course_id AS courseId, grade,
-                    semester, year, status, DATE_FORMAT(enrolled_date, '%Y-%m-%d') AS enrolledDate
+            `SELECT id, student_id AS studentId, course_id AS courseId, branch,
+                    study_year AS studyYear, grade, semester, year, status,
+                    DATE_FORMAT(enrolled_date, '%Y-%m-%d') AS enrolledDate
              FROM enrollments WHERE id = $1`,
             [id]
         );
@@ -81,11 +87,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             updateData.status !== undefined && updateData.status !== current.rows[0].status) {
             return res.status(409).json({ message: "Cancelled or completed enrollments cannot change status." });
         }
+        const duplicateFieldsChanged = ["studentId", "semester", "year"]
+            .some(field => field in updateData);
+        if (duplicateFieldsChanged && updated.courseId === null) {
+            const duplicate = await getPool().query(
+                `SELECT id FROM enrollments
+                 WHERE student_id = $1 AND semester = $2 AND year = $3 AND id <> $4`,
+                [updated.studentId, updated.semester, updated.year, id]
+            );
+            if (duplicate.rows[0]) {
+                return res.status(409).json({ message: "This student already has an enrollment for that academic period." });
+            }
+        }
+        const branch = String(updated.branch);
+        if (updateData.studentId !== undefined) {
+            const student = await getPool().query(
+                "SELECT id FROM students WHERE id = $1",
+                [updated.studentId]
+            );
+            if (!student.rows[0]) return res.status(404).json({ message: "Student not found." });
+        }
         await getPool().query(
-            `UPDATE enrollments SET student_id = $1, course_id = $2, grade = $3,
-                    semester = $4, year = $5, status = $6, enrolled_date = $7
-             WHERE id = $8`,
-            [updated.studentId, updated.courseId, updated.grade ?? null, updated.semester,
+            `UPDATE enrollments SET student_id = $1, course_id = $2, branch = $3, study_year = $4,
+                    grade = $5, semester = $6, year = $7, status = $8, enrolled_date = $9
+             WHERE id = $10`,
+            [updated.studentId, updated.courseId, branch,
+                updated.studyYear ?? null, updated.grade ?? null, updated.semester,
                 updated.year, updated.status, updated.enrolledDate, id]
         );
         await writeAuditLog(user.id, "enrollment.updated", "enrollment", id, {
@@ -93,8 +120,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             gradeChanged: updateData.grade !== undefined
         });
         const { rows } = await getPool().query(
-            `SELECT id, student_id AS studentId, course_id AS courseId, grade,
-                    semester, year, status, DATE_FORMAT(enrolled_date, '%Y-%m-%d') AS enrolledDate
+            `SELECT id, student_id AS studentId, course_id AS courseId, branch,
+                    study_year AS studyYear, grade, semester, year, status,
+                    DATE_FORMAT(enrolled_date, '%Y-%m-%d') AS enrolledDate
              FROM enrollments WHERE id = $1`,
             [id]
         );
@@ -103,8 +131,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ...row,
             id: Number(row.id),
             studentId: Number(row.studentId),
-            courseId: Number(row.courseId),
-            year: Number(row.year)
+            courseId: row.courseId === null ? null : Number(row.courseId),
+            year: Number(row.year),
+            studyYear: row.studyYear === null ? null : Number(row.studyYear)
         });
     }
 

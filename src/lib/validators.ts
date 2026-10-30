@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ENROLLMENT_BRANCHES, ENROLLMENT_STUDY_YEARS } from "@/lib/enrollment-options";
 
 // Student Schema
 export const studentSchema = z.object({
@@ -18,15 +19,15 @@ export const courseSchema = z.object({
     code: z.string().min(2, "Course code must be at least 2 characters"),
     name: z.string().min(3, "Course name must be at least 3 characters"),
     credits: z.number().int("Credits must be an integer").min(1).max(6),
-    department: z.string().min(2, "Department must be at least 2 characters"),
+    branch: z.enum(ENROLLMENT_BRANCHES),
     instructor: z.string().optional()
 });
 
 export type CourseFormData = z.infer<typeof courseSchema>;
 
-export const facultyCourseUpdateSchema = courseSchema.pick({
-    name: true,
-    department: true
+export const facultyCourseUpdateSchema = z.object({
+    name: z.string().min(3, "Course name must be at least 3 characters"),
+    department: z.string().min(2, "Department must be at least 2 characters")
 });
 
 export type FacultyCourseUpdateData = z.infer<typeof facultyCourseUpdateSchema>;
@@ -45,7 +46,8 @@ export type FacultyFormData = z.infer<typeof facultySchema>;
 // Enrollment Schema
 export const enrollmentSchema = z.object({
     studentId: z.number().int().positive("Student ID must be a positive integer"),
-    courseId: z.number().int().positive("Course ID must be a positive integer"),
+    branch: z.string().trim().toUpperCase().pipe(z.enum(ENROLLMENT_BRANCHES)),
+    studyYear: z.number().int().min(1).max(4),
     grade: z.string().max(8).nullable().optional(),
     semester: z.string().trim().min(1, "Semester is required").max(32),
     year: z.number().int().min(1900).max(2200),
@@ -54,6 +56,18 @@ export const enrollmentSchema = z.object({
 });
 
 export type EnrollmentFormData = z.infer<typeof enrollmentSchema>;
+
+export const enrollmentFormSchema = enrollmentSchema.superRefine((data, context) => {
+    if (!ENROLLMENT_STUDY_YEARS[data.branch].includes(data.studyYear)) {
+        context.addIssue({
+            code: "custom",
+            path: ["studyYear"],
+            message: `${data.branch} supports only ${ENROLLMENT_STUDY_YEARS[data.branch].length} years of study.`
+        });
+    }
+});
+
+export type EnrollmentFormInput = z.input<typeof enrollmentFormSchema>;
 
 export const facultyEnrollmentUpdateSchema = z.object({
     grade: z.string().max(8).nullable().optional(),

@@ -5,7 +5,7 @@ import { getPagination, getQueryString, getRecordCount } from "@/lib/academic-ac
 import { requireUser, writeAuditLog } from "@/lib/auth";
 
 const courseSelect = `
-    SELECT c.id, c.code, c.name, c.credits, c.department,
+    SELECT c.id, c.code, c.name, c.credits, c.department, c.branch,
            COALESCE(f.name, c.instructor) AS instructor, c.faculty_id AS facultyId
     FROM courses c
     LEFT JOIN faculty f ON f.id = c.faculty_id
@@ -19,6 +19,7 @@ const courseSelect = `
            OR LOWER(c.name) LIKE CONCAT('%', LOWER($3), '%'))
       AND ($4 = '' OR LOWER(c.department) LIKE CONCAT('%', LOWER($4), '%'))
       AND ($5 IS NULL OR c.credits = $5)
+      AND ($6 = '' OR c.branch = $6)
 `;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -29,12 +30,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { page, limit, offset } = getPagination(req);
         const search = getQueryString(req, "search");
         const department = getQueryString(req, "department");
+        const branch = getQueryString(req, "branch");
         const credits = getQueryString(req, "credits");
         const creditsFilter = credits && /^\d+$/.test(credits) ? Number(credits) : null;
-        const values = [user.role, user.studentId, search, department, creditsFilter] as const;
+        if (branch && !["MCA", "MBA", "CSE", "AIML", "IS", "EC", "MECH", "CIVIL"].includes(branch)) {
+            return res.status(400).json({ message: "Invalid course branch filter." });
+        }
+        const values = [user.role, user.studentId, search, department, creditsFilter, branch] as const;
         const [result, total] = await Promise.all([
             getPool().query(
-                `${courseSelect} ORDER BY c.code LIMIT $6 OFFSET $7`,
+                `${courseSelect} ORDER BY c.code LIMIT $7 OFFSET $8`,
                 [...values, limit, offset]
             ),
             getRecordCount(`SELECT COUNT(*) AS total FROM (${courseSelect}) matching`, [...values])
@@ -44,6 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 ...row,
                 id: Number(row.id),
                 credits: Number(row.credits),
+                department: row.department ?? "",
                 facultyId: row.facultyId === null ? null : Number(row.facultyId)
             })),
             meta: { total, page, limit }
@@ -68,16 +74,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ? await client.query("SELECT id FROM faculty WHERE name = $1 ORDER BY id LIMIT 1", [parsed.data.instructor])
             : { rows: [] };
         const inserted = await client.query(
-            `INSERT INTO courses (code, name, credits, department, instructor, faculty_id)
+            `INSERT INTO courses (code, name, credits, branch, instructor, faculty_id)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [parsed.data.code, parsed.data.name, parsed.data.credits, parsed.data.department,
+            [parsed.data.code, parsed.data.name, parsed.data.credits, parsed.data.branch,
                 parsed.data.instructor ?? null, facultyResult.rows[0]?.id ?? null]
         );
         const { rows } = await client.query(
-            "SELECT id, code, name, credits, department, instructor FROM courses WHERE id = $1",
+            "SELECT id, code, name, credits, department, branch, instructor FROM courses WHERE id = $1",
             [inserted.insertId]
         );
-        const course = { ...rows[0], id: Number(rows[0].id), credits: Number(rows[0].credits) };
+        const course = {
+            ...rows[0],
+            id: Number(rows[0].id),
+            credits: Number(rows[0].credits),
+            department: rows[0].department ?? ""
+        };
         await client.commit();
         await writeAuditLog(user.id, "course.created", "course", course.id);
         return res.status(201).json(course);

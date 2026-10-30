@@ -1,0 +1,2 @@
+ALTER TABLE enrollments
+    MODIFY COLUMN course_id BIGINT UNSIGNED NULL;
